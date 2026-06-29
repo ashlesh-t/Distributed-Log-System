@@ -7,7 +7,9 @@ class NodeStatusManager:
     A class to manage node status in Elasticsearch.
     """
 
-    def __init__(self, es_host: str = "http://localhost:9200", index_name: str = "node_status"):
+    def __init__(
+        self, es_host: str = "http://localhost:9200", index_name: str = "node_status"
+    ):
         """
         Initialize the NodeStatusManager.
 
@@ -33,11 +35,8 @@ class NodeStatusManager:
 
             # Prepare the document
             update_doc = {
-                "doc": {
-                    "status": status,
-                    "timestamp": current_time
-                },
-                "doc_as_upsert": True
+                "doc": {"status": status, "timestamp": current_time},
+                "doc_as_upsert": True,
             }
 
             # Perform the upsert
@@ -54,7 +53,9 @@ class NodeStatusManager:
             dict: A dictionary of all node data.
         """
         try:
-            response = await self.es.search(index=self.index_name, body={"query": {"match_all": {}}})
+            response = await self.es.search(
+                index=self.index_name, body={"query": {"match_all": {}}}
+            )
             nodes = {hit["_id"]: hit["_source"] for hit in response["hits"]["hits"]}
             return nodes
         except Exception as e:
@@ -69,7 +70,9 @@ class NodeStatusManager:
             dict: A dictionary of all node data.
         """
         try:
-            response = await self.es.search(index=self.index_name, body={"query": {"match_all": {}}})
+            response = await self.es.search(
+                index=self.index_name, body={"query": {"match_all": {}}}
+            )
             nodes = {hit["_id"]: hit["_source"] for hit in response["hits"]["hits"]}
             return nodes
         except Exception as e:
@@ -81,12 +84,11 @@ class NodeStatusManager:
         Close the Elasticsearch client.
         """
         await self.es.close()
-        
-        
+
     async def delete_node_status(self, node_id: str):
         """
         Delete a node's status from Elasticsearch.
-    
+
         Parameters:
             node_id (str): The ID of the node to be deleted.
         """
@@ -100,7 +102,6 @@ class NodeStatusManager:
                 print(f"Node {node_id} does not exist in Elasticsearch.")
         except Exception as e:
             print(f"Error deleting node {node_id}: {e}")
-
 
 
 # Usage Example

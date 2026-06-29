@@ -11,7 +11,7 @@ def get_node_id(service_name: str) -> str:
     if env_id := os.environ.get("NODE_ID"):
         return env_id
 
-    path = Path(f"/tmp/{service_name}.uuid")
+    path = Path(f"/tmp/{service_name}.uuid")  # nosec
     if path.exists():
         return path.read_text().strip()
 

@@ -4,6 +4,7 @@ from common.logger import get_json_logger
 
 logger = get_json_logger("heartbeat")
 
+
 class HeartbeatPublisher:
     """Publishes heartbeats by writing structured JSON to stdout/logger."""
 

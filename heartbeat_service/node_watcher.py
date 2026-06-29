@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from heartbeat_service.restart_handler import RestartHandler
 from heartbeat_service.webhook_notifier import WebhookNotifier
-from log_pipeline.node_status import NodeStatusManager
+from heartbeat_service.node_status import NodeStatusManager
 
 TIMEOUT = float(os.environ.get("HEARTBEAT_TIMEOUT_SECONDS", "15"))
 CHECK_INTERVAL = 2.0
@@ -34,7 +34,9 @@ class NodeWatcher:
         await self._ns.upsert(node_id, service_name, "active")
         await self._webhooks.notify(node_id, service_name, "node_up")
 
-    async def _mark_failed(self, node_id: str, service_name: str, graceful: bool = False) -> None:
+    async def _mark_failed(
+        self, node_id: str, service_name: str, graceful: bool = False
+    ) -> None:
         event = "node_down"
         print(f"[watcher] {node_id} ({service_name}) DOWN (graceful={graceful})")
         await self._ns.upsert(node_id, service_name, "failed")

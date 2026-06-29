@@ -83,11 +83,20 @@ async def log_stats(
     es = get_es()
     resp = await es.search(index="distributed_logs-*", body=body)
     total = resp["hits"]["total"]["value"]
-    by_level = {b["key"]: b["doc_count"] for b in resp["aggregations"]["by_level"]["buckets"]}
-    by_service = {b["key"]: b["doc_count"] for b in resp["aggregations"]["by_service"]["buckets"]}
+    by_level = {
+        b["key"]: b["doc_count"] for b in resp["aggregations"]["by_level"]["buckets"]
+    }
+    by_service = {
+        b["key"]: b["doc_count"] for b in resp["aggregations"]["by_service"]["buckets"]
+    }
     error_count = by_level.get("ERROR", 0)
     error_rate = round((error_count / total * 100), 2) if total else 0.0
-    return LogStats(total_logs=total, by_level=by_level, by_service=by_service, error_rate_pct=error_rate)
+    return LogStats(
+        total_logs=total,
+        by_level=by_level,
+        by_service=by_service,
+        error_rate_pct=error_rate,
+    )
 
 
 @router.get("/{log_id}", response_model=LogEntry)
@@ -100,5 +109,6 @@ async def get_log(log_id: str, key_meta: dict = Depends(verify_api_key)):
     hits = resp["hits"]["hits"]
     if not hits:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404, detail="Log not found")
     return LogEntry(**hits[0]["_source"])

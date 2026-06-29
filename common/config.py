@@ -1,5 +1,5 @@
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -23,7 +23,9 @@ def load_settings() -> Settings:
         fluentd_host=os.environ.get("FLUENTD_HOST", "fluentd"),
         fluentd_port=int(os.environ.get("FLUENTD_PORT", "9880")),
         kafka_bootstrap_servers=os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092"),
-        elasticsearch_host=os.environ.get("ELASTICSEARCH_HOST", "http://elasticsearch:9200"),
+        elasticsearch_host=os.environ.get(
+            "ELASTICSEARCH_HOST", "http://elasticsearch:9200"
+        ),
         service_name=os.environ.get("SERVICE_NAME", "unknown_service"),
         heartbeat_interval=float(os.environ.get("HEARTBEAT_INTERVAL_SECONDS", "5")),
         heartbeat_timeout=float(os.environ.get("HEARTBEAT_TIMEOUT_SECONDS", "15")),

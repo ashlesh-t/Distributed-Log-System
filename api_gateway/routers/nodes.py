@@ -13,7 +13,9 @@ _restarter = RestartHandler()
 @router.get("", response_model=NodesResponse)
 async def list_nodes(key_meta: dict = Depends(verify_api_key)):
     es = get_es()
-    resp = await es.search(index="node_status", body={"query": {"match_all": {}}, "size": 1000})
+    resp = await es.search(
+        index="node_status", body={"query": {"match_all": {}}, "size": 1000}
+    )
     nodes = [NodeInfo(**h["_source"]) for h in resp["hits"]["hits"]]
     return NodesResponse(nodes=nodes)
 
@@ -43,12 +45,21 @@ async def restart_node(node_id: str, key_meta: dict = Depends(verify_api_key)):
 
 
 @router.get("/{node_id}/heartbeats")
-async def node_heartbeats(node_id: str, limit: int = 20, key_meta: dict = Depends(verify_api_key)):
+async def node_heartbeats(
+    node_id: str, limit: int = 20, key_meta: dict = Depends(verify_api_key)
+):
     es = get_es()
     resp = await es.search(
         index="distributed_logs-*",
         body={
-            "query": {"bool": {"filter": [{"term": {"node_id": node_id}}, {"term": {"message_type": "HEARTBEAT"}}]}},
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"term": {"node_id": node_id}},
+                        {"term": {"message_type": "HEARTBEAT"}},
+                    ]
+                }
+            },
             "sort": [{"timestamp": {"order": "desc"}}],
             "size": min(limit, 100),
         },

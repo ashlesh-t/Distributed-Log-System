@@ -34,7 +34,10 @@ LOG_MESSAGES = {
         {"error_code": "INV002", "error_message": "Database connection lost"},
         {"error_code": "INV003", "error_message": "Unable to retrieve supplier data"},
         {"error_code": "INV004", "error_message": "Invalid product ID"},
-        {"error_code": "INV005", "error_message": "Unexpected server error in InventoryService"},
+        {
+            "error_code": "INV005",
+            "error_message": "Unexpected server error in InventoryService",
+        },
     ],
 }
 
@@ -43,7 +46,7 @@ async def generate_logs(node_id: str) -> None:
     while True:
         level = random.choices(["INFO", "WARN", "ERROR"], weights=[0.75, 0.15, 0.10])[0]
         entry = random.choice(LOG_MESSAGES[level])
-        
+
         data = {
             "node_id": node_id,
             "service_name": SERVICE_NAME,
@@ -56,14 +59,14 @@ async def generate_logs(node_id: str) -> None:
             data["error_details"] = entry
         elif level == "WARN":
             data["response_time_ms"] = random.randint(10, 100)
-            
+
         if level == "ERROR":
             logger.error(data["message"], extra=data)
         elif level == "WARN":
             logger.warning(data["message"], extra=data)
         else:
             logger.info(data["message"], extra=data)
-            
+
         await asyncio.sleep(random.uniform(0.1, 1.0))
 
 

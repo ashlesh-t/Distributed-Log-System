@@ -6,7 +6,6 @@ Run: streamlit run demo.py
 import os
 import time
 from datetime import datetime, timedelta, timezone
-from io import StringIO
 
 import httpx
 import pandas as pd
@@ -23,8 +22,12 @@ st.set_page_config(
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.title("📡 DLS PaaS")
-    api_base = st.text_input("API Base URL", value=os.environ.get("API_BASE_URL", "http://localhost:8000"))
-    api_key = st.text_input("API Key", type="password", value=st.session_state.get("api_key", ""))
+    api_base = st.text_input(
+        "API Base URL", value=os.environ.get("API_BASE_URL", "http://localhost:8000")
+    )
+    api_key = st.text_input(
+        "API Key", type="password", value=st.session_state.get("api_key", "")
+    )
     if api_key:
         st.session_state["api_key"] = api_key
 
@@ -84,7 +87,13 @@ def api_delete(path: str):
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 tab1, tab2, tab3, tab4, tab5 = st.tabs(
-    ["🖥 System Overview", "📋 Live Log Stream", "💓 Node Health", "📊 Analytics", "⚙ Configuration"]
+    [
+        "🖥 System Overview",
+        "📋 Live Log Stream",
+        "💓 Node Health",
+        "📊 Analytics",
+        "⚙ Configuration",
+    ]
 )
 
 
@@ -111,7 +120,12 @@ with tab1:
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Total Nodes", len(nodes))
         c2.metric("Active", active, delta=None)
-        c3.metric("Failed", failed, delta=f"-{failed}" if failed else None, delta_color="inverse")
+        c3.metric(
+            "Failed",
+            failed,
+            delta=f"-{failed}" if failed else None,
+            delta_color="inverse",
+        )
 
         if stats_data:
             err_rate = stats_data.get("error_rate_pct", 0)
@@ -143,7 +157,14 @@ with tab2:
     col_a, col_b, col_c = st.columns([2, 1, 1])
     with col_a:
         service_filter = st.selectbox(
-            "Service", ["All", "Inventory_Service", "Order_Service", "Payment_Service", "Shipping_Service"]
+            "Service",
+            [
+                "All",
+                "Inventory_Service",
+                "Order_Service",
+                "Payment_Service",
+                "Shipping_Service",
+            ],
         )
     with col_b:
         level_filter = st.selectbox("Log Level", ["All", "INFO", "WARN", "ERROR"])
@@ -165,7 +186,9 @@ with tab2:
             st.caption(f"Showing {len(logs)} of {logs_resp.get('total', 0)} logs")
             if logs:
                 df = pd.DataFrame(logs)
-                df = df[["timestamp", "log_level", "service_name", "message", "node_id"]].rename(
+                df = df[
+                    ["timestamp", "log_level", "service_name", "message", "node_id"]
+                ].rename(
                     columns={
                         "timestamp": "Timestamp",
                         "log_level": "Level",
@@ -182,7 +205,9 @@ with tab2:
                         return ["background-color: #fff3cc"] * len(row)
                     return [""] * len(row)
 
-                st.dataframe(df.style.apply(_color, axis=1), use_container_width=True, height=500)
+                st.dataframe(
+                    df.style.apply(_color, axis=1), use_container_width=True, height=500
+                )
 
                 # Export
                 csv = df.to_csv(index=False)
@@ -205,7 +230,12 @@ with tab3:
         if not nodes:
             st.info("No nodes registered yet.")
         else:
-            node_options = {f"{n.get('service_name', n['node_id'])} — {n['node_id'][:12]}": n["node_id"] for n in nodes}
+            node_options = {
+                f"{n.get('service_name', n['node_id'])} — {n['node_id'][:12]}": n[
+                    "node_id"
+                ]
+                for n in nodes
+            }
             selected_label = st.selectbox("Select Node", list(node_options.keys()))
             selected_id = node_options[selected_label]
 
@@ -230,7 +260,9 @@ with tab3:
             if st.button("🔄 Trigger Restart", type="primary"):
                 result = api_post(f"/v1/nodes/{selected_id}/restart")
                 if result:
-                    st.success(f"Restart triggered via {result.get('backend', 'unknown')} backend")
+                    st.success(
+                        f"Restart triggered via {result.get('backend', 'unknown')} backend"
+                    )
                 else:
                     st.error("Restart failed")
 
@@ -243,7 +275,9 @@ with tab4:
 
     col_d, col_e = st.columns(2)
     with col_d:
-        from_dt = st.date_input("From", datetime.now(timezone.utc).date() - timedelta(days=1))
+        from_dt = st.date_input(
+            "From", datetime.now(timezone.utc).date() - timedelta(days=1)
+        )
     with col_e:
         to_dt = st.date_input("To", datetime.now(timezone.utc).date())
 
@@ -260,12 +294,16 @@ with tab4:
         col_f, col_g = st.columns(2)
         with col_f:
             st.subheader("Logs by Level")
-            df_level = pd.DataFrame(stats["by_level"].items(), columns=["Level", "Count"])
+            df_level = pd.DataFrame(
+                stats["by_level"].items(), columns=["Level", "Count"]
+            )
             st.bar_chart(df_level.set_index("Level"))
 
         with col_g:
             st.subheader("Logs by Service")
-            df_svc = pd.DataFrame(stats["by_service"].items(), columns=["Service", "Count"])
+            df_svc = pd.DataFrame(
+                stats["by_service"].items(), columns=["Service", "Count"]
+            )
             st.bar_chart(df_svc.set_index("Service"))
 
 
@@ -297,12 +335,19 @@ with tab5:
 
     st.subheader("Add Webhook")
     with st.form("add_webhook"):
-        wh_url = st.text_input("Webhook URL", placeholder="https://your-server.com/webhook")
-        wh_events = st.multiselect("Events", ["node_down", "node_up", "error_spike"], default=["node_down"])
+        wh_url = st.text_input(
+            "Webhook URL", placeholder="https://your-server.com/webhook"
+        )
+        wh_events = st.multiselect(
+            "Events", ["node_down", "node_up", "error_spike"], default=["node_down"]
+        )
         wh_secret = st.text_input("HMAC Secret (optional)", type="password")
         submitted = st.form_submit_button("Register Webhook")
         if submitted and wh_url:
-            result = api_post("/v1/webhooks", {"url": wh_url, "events": wh_events, "secret": wh_secret})
+            result = api_post(
+                "/v1/webhooks",
+                {"url": wh_url, "events": wh_events, "secret": wh_secret},
+            )
             if result:
                 st.success(f"Webhook registered: {result.get('webhook_id')}")
                 st.rerun()

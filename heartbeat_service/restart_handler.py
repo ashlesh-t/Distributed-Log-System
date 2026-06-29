@@ -14,8 +14,11 @@ class RestartHandler:
     async def _restart_docker(self, node_id: str, service_name: str) -> None:
         try:
             import docker  # type: ignore
+
             client = docker.from_env()
-            name = os.environ.get(f"CONTAINER_{node_id.replace('-', '_')}", service_name.lower())
+            name = os.environ.get(
+                f"CONTAINER_{node_id.replace('-', '_')}", service_name.lower()
+            )
             container = client.containers.get(name)
             container.restart(timeout=10)
             print(f"[restart] Docker restarted container '{name}'")
@@ -39,13 +42,17 @@ class RestartHandler:
                     "template": {
                         "metadata": {
                             "annotations": {
-                                "kubectl.kubernetes.io/restartedAt": datetime.now(timezone.utc).isoformat()
+                                "kubectl.kubernetes.io/restartedAt": datetime.now(
+                                    timezone.utc
+                                ).isoformat()
                             }
                         }
                     }
                 }
             }
-            apps.patch_namespaced_deployment(name=service_name.lower(), namespace=namespace, body=patch)
+            apps.patch_namespaced_deployment(
+                name=service_name.lower(), namespace=namespace, body=patch
+            )
             print(f"[restart] K8s rollout restart triggered for '{service_name}'")
         except Exception as exc:
             print(f"[restart] K8s restart failed for {service_name}: {exc}")

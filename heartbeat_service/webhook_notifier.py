@@ -20,14 +20,19 @@ class WebhookNotifier:
         }
         # Fire global webhook if configured
         if self._global_url:
-            await self._post(self._global_url, payload, secret=os.environ.get("WEBHOOK_SECRET", ""))
+            await self._post(
+                self._global_url, payload, secret=os.environ.get("WEBHOOK_SECRET", "")
+            )
 
         # Also notify per-tenant webhooks stored in ES (loaded by api_gateway)
         await self._notify_es_webhooks(node_id, event, payload)
 
-    async def _notify_es_webhooks(self, node_id: str, event: str, payload: dict) -> None:
+    async def _notify_es_webhooks(
+        self, node_id: str, event: str, payload: dict
+    ) -> None:
         try:
             from elasticsearch import AsyncElasticsearch
+
             host = os.environ.get("ELASTICSEARCH_HOST", "http://elasticsearch:9200")
             es = AsyncElasticsearch(host)
             resp = await es.search(
@@ -47,7 +52,11 @@ class WebhookNotifier:
     async def _post(self, url: str, payload: dict, secret: str = "") -> None:
         headers = {"Content-Type": "application/json"}
         if secret:
-            sig = hmac.new(secret.encode(), json.dumps(payload, sort_keys=True).encode(), hashlib.sha256).hexdigest()
+            sig = hmac.new(
+                secret.encode(),
+                json.dumps(payload, sort_keys=True).encode(),
+                hashlib.sha256,
+            ).hexdigest()
             headers["X-Signature-256"] = f"sha256={sig}"
         for attempt in range(2):
             try:

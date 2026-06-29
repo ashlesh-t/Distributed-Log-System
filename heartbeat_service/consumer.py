@@ -23,7 +23,7 @@ async def main() -> None:
             await consumer.start()
             break
         except Exception as exc:
-            wait = min(2 ** attempt, 30)
+            wait = min(2**attempt, 30)
             print(f"[heartbeat_service] Kafka connect failed ({exc}), retry in {wait}s")
             await asyncio.sleep(wait)
     else:

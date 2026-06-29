@@ -1,5 +1,6 @@
 from fluent import sender
 
+
 class Logger1:
     def __init__(self, reg=None, heartbeat=None, logs=None):
         self.logger = sender.FluentSender(
@@ -24,6 +25,6 @@ class Logger1:
         except Exception as e:
             print(f"Failed to send log to Fluentd: {e}")
 
-    def close(self,close_data):
-        self.send_log('logs',close_data)
+    def close(self, close_data):
+        self.send_log("logs", close_data)
         self.logger.close()

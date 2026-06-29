@@ -26,17 +26,23 @@ async def verify_api_key(x_api_key: str = Header(...)) -> dict:
         )
         hits = resp["hits"]["hits"]
         if not hits:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key"
+            )
         return hits[0]["_source"]
     except HTTPException:
         raise
     except Exception:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key"
+        )
 
 
 def verify_admin(x_admin_secret: str = Header(...)) -> None:
     if x_admin_secret != ADMIN_SECRET:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid admin secret")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Invalid admin secret"
+        )
 
 
 async def create_api_key(owner_email: str) -> tuple[str, str]:

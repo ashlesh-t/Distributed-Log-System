@@ -6,10 +6,17 @@ from api_gateway.schemas import AdminKeyCreate, AdminKeyResponse
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
-@router.post("/keys", response_model=AdminKeyResponse, status_code=201, dependencies=[Depends(verify_admin)])
+@router.post(
+    "/keys",
+    response_model=AdminKeyResponse,
+    status_code=201,
+    dependencies=[Depends(verify_admin)],
+)
 async def issue_api_key(body: AdminKeyCreate):
     plaintext, key_id = await create_api_key(body.owner_email)
-    return AdminKeyResponse(api_key=plaintext, key_id=key_id, owner_email=body.owner_email)
+    return AdminKeyResponse(
+        api_key=plaintext, key_id=key_id, owner_email=body.owner_email
+    )
 
 
 @router.delete("/keys/{key_id}", status_code=204, dependencies=[Depends(verify_admin)])

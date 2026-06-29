@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Literal
-from pydantic import BaseModel, HttpUrl, field_validator
-
+from typing import Literal
+from pydantic import BaseModel, field_validator
 
 # ── Logs ──────────────────────────────────────────────────────────────────────
+
 
 class ErrorDetails(BaseModel):
     error_code: str
@@ -38,6 +38,7 @@ class LogStats(BaseModel):
 
 # ── Nodes ─────────────────────────────────────────────────────────────────────
 
+
 class NodeInfo(BaseModel):
     node_id: str
     service_name: str
@@ -55,6 +56,7 @@ class RestartResponse(BaseModel):
 
 
 # ── Webhooks ──────────────────────────────────────────────────────────────────
+
 
 class WebhookCreate(BaseModel):
     url: str
@@ -81,6 +83,7 @@ class WebhooksResponse(BaseModel):
 
 # ── Admin ─────────────────────────────────────────────────────────────────────
 
+
 class AdminKeyCreate(BaseModel):
     owner_email: str
 
@@ -93,6 +96,7 @@ class AdminKeyResponse(BaseModel):
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
+
 
 class HealthResponse(BaseModel):
     status: str

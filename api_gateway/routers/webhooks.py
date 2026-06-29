@@ -55,7 +55,10 @@ async def test_webhook(webhook_id: str, key_meta: dict = Depends(verify_api_key)
     except Exception:
         raise HTTPException(status_code=404, detail="Webhook not found")
 
-    payload = {"event": "test", "message": "This is a test webhook from the Distributed Log System PaaS"}
+    payload = {
+        "event": "test",
+        "message": "This is a test webhook from the Distributed Log System PaaS",
+    }
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             r = await client.post(url, json=payload)
