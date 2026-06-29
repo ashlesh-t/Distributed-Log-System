@@ -1,11 +1,12 @@
 from elasticsearch import AsyncElasticsearch
 from elasticsearch.helpers import async_bulk
-from datetime import datetime
 import uuid
 
 
 class ElasticsearchLogStorage:
-    def __init__(self, hosts=['http://localhost:9200'], index_prefix='distributed_logs'):
+    def __init__(
+        self, hosts=["http://localhost:9200"], index_prefix="distributed_logs"
+    ):
         """
         Initialize asynchronous Elasticsearch connection with flexible configuration.
         """
@@ -21,7 +22,7 @@ class ElasticsearchLogStorage:
             "settings": {
                 "number_of_shards": 3,
                 "number_of_replicas": 1,
-                "max_ngram_diff": 50
+                "max_ngram_diff": 50,
             },
             "mappings": {
                 "properties": {
@@ -39,19 +40,20 @@ class ElasticsearchLogStorage:
                         "type": "object",
                         "properties": {
                             "error_code": {"type": "keyword"},
-                            "error_message": {"type": "text"}
-                        }
-                    }
+                            "error_message": {"type": "text"},
+                        },
+                    },
                 }
-            }
+            },
         }
         try:
             # Create or update the template
             await self.es_client.indices.put_template(
-                name=f"{self.index_prefix}_template",
-                body=template
+                name=f"{self.index_prefix}_template", body=template
             )
-            print(f"Index template {self.index_prefix}_template created/updated successfully.")
+            print(
+                f"Index template {self.index_prefix}_template created/updated successfully."
+            )
         except Exception as e:
             print(f"Error creating/updating index template: {e}")
 
@@ -70,11 +72,13 @@ class ElasticsearchLogStorage:
                 logs = [logs]
 
             index_name = self._get_daily_index_name()
-            
+
             # Ensure all required indices are created before bulk indexing
             unique_indices = set()
             for log in logs:
-                current_index = f"{index_name}-{log['node_id']}" if 'node_id' in log else index_name
+                current_index = (
+                    f"{index_name}-{log['node_id']}" if "node_id" in log else index_name
+                )
                 unique_indices.add(current_index)
 
             # Create missing indices asynchronously
@@ -85,13 +89,17 @@ class ElasticsearchLogStorage:
             # Prepare logs for bulk indexing
             def log_generator():
                 for log in logs:
-                    current_index = f"{index_name}-{log['node_id']}" if 'node_id' in log else index_name
-                    if 'log_id' not in log:
-                        log['log_id'] = str(uuid.uuid4())
+                    current_index = (
+                        f"{index_name}-{log['node_id']}"
+                        if "node_id" in log
+                        else index_name
+                    )
+                    if "log_id" not in log:
+                        log["log_id"] = str(uuid.uuid4())
                     yield {
                         "_index": current_index,
-                        "_id": log['log_id'],
-                        "_source": log
+                        "_id": log["log_id"],
+                        "_source": log,
                     }
 
             # Asynchronous bulk index
