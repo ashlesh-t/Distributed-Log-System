@@ -2,6 +2,7 @@
 
 > **A production-ready Platform as a Service (PaaS) framework for decoupled log aggregation, unified health monitoring, and alerting. Package-installable and fully configurable for local development or cloud clusters.**
 
+> **NOTE: There are few issues with installations and usage will be updated shortly in the release**
 ---
 
 ## Architecture Overview
