@@ -1,7 +1,14 @@
-FROM python:3.11-slim
+# Build stage
+FROM golang:1.22-alpine AS builder
 WORKDIR /app
-COPY log_pipeline/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY log_pipeline/ ./log_pipeline/
-ENV PYTHONUNBUFFERED=1
-CMD ["python", "-m", "log_pipeline.main"]
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -o log_pipeline .
+
+# Run stage
+FROM alpine:latest
+RUN apk --no-cache add ca-certificates
+WORKDIR /app/
+COPY --from=builder /app/log_pipeline .
+CMD ["./log_pipeline"]
