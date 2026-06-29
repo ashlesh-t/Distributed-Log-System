@@ -190,9 +190,6 @@ def start_consumers():
     asyncio.run(consume_logs_and_heartbeats())
 
 
-
-
-
 def handle_shutdown_signal(signal, frame):
     """Handle shutdown signals like Ctrl+C."""
     print("Application is shutting down...")
