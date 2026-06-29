@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+bases:
+  - ../../base
+
+# Local Minikube patches: NodePort services, single replicas, smaller storage
+patches:
+  - path: patch-nginx-nodeport.yaml
+  - path: patch-replicas.yaml
+
+images:
+  - name: dls/api-gateway
+    newTag: local
+  - name: dls/log-pipeline
+    newTag: local
+  - name: dls/heartbeat-service
+    newTag: local
+  - name: dls/inventory-service
+    newTag: local
+  - name: dls/order-service
+    newTag: local
+  - name: dls/payment-service
+    newTag: local
+  - name: dls/shipping-service
+    newTag: local

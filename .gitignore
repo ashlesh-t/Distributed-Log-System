@@ -1,1 +1,45 @@
+# Sensitive runtime files — never commit
+*.key
+*.pkl
+.env
+ssl/
+*.pem
+*.crt
+*.p12
+
+# Python
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+*.whl
+.venv/
+venv/
+env/
+
+# Editors / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+
+# Test / coverage artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Docker build cache
+*.dockerignore
+
+# Kubernetes secrets (generated)
+k8s/overlays/production/secrets.yaml

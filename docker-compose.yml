@@ -1,46 +1,230 @@
-version: '3.8'
+version: "3.9"
+
+x-service-common: &service-common
+  restart: unless-stopped
+  env_file:
+    - path: .env
+      required: false
+
+x-logging-fluentd: &logging-fluentd
+  logging:
+    driver: fluentd
+    options:
+      fluentd-address: "localhost:9880"
+      fluentd-async-connect: "true"
+      tag: "docker.{{.Name}}"
 
 services:
+  # ─── Infrastructure ────────────────────────────────────────────────────────
+
   zookeeper:
+    <<: *service-common
     image: confluentinc/cp-zookeeper:7.5.0
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
-    ports:
-      - "2181:2181"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   kafka:
+    <<: *service-common
     image: confluentinc/cp-kafka:7.5.0
     depends_on:
-      - zookeeper
-    ports:
-      - "9092:9092"
+      zookeeper:
+        condition: service_healthy
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  elasticsearch:
+    <<: *service-common
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
+    environment:
+      discovery.type: single-node
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+      xpack.security.enabled: "false"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -v '\"status\":\"red\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  kibana:
+    <<: *service-common
+    image: docker.elastic.co/kibana/kibana:8.13.0
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    ports:
+      - "5601:5601"
 
   fluentd:
-    image: fluent/fluentd:v1.16-1
+    <<: *service-common
+    image: fluent/fluentd-kubernetes-daemonset:v1.16-debian-kafka2-1
+    depends_on:
+      kafka:
+        condition: service_healthy
     volumes:
-      - ./fluentd/fluent.conf:/fluentd/etc/fluent.conf
+      - ./fluentd/fluentd.conf:/fluentd/etc/fluent.conf:ro
     ports:
       - "9880:9880"
-    depends_on:
-      - kafka
+      - "24220:24220"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:24220/api/plugins.json || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
-  producer:
+  # ─── Core Pipeline ─────────────────────────────────────────────────────────
+
+  log_pipeline:
+    <<: *service-common
     build:
-      context: ./inventory_service
+      context: .
+      dockerfile: log_pipeline/Dockerfile
     depends_on:
-      - fluentd
+      kafka:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
     environment:
-      FLUENTD_HOST: fluentd
-      FLUENTD_PORT: 9880
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ELASTICSEARCH_HOST: http://elasticsearch:9200
 
-  consumer:
+  heartbeat_service:
+    <<: *service-common
     build:
-      context: ./PUB-SUB
+      context: .
+      dockerfile: heartbeat_service/Dockerfile
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ELASTICSEARCH_HOST: http://elasticsearch:9200
+      RESTART_BACKEND: docker
+      HEARTBEAT_TIMEOUT_SECONDS: "15"
+      WEBHOOK_URL: ${WEBHOOK_URL:-}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  # ─── API Gateway ───────────────────────────────────────────────────────────
+
+  api_gateway:
+    <<: *service-common
+    build:
+      context: .
+      dockerfile: api_gateway/Dockerfile
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      ELASTICSEARCH_HOST: http://elasticsearch:9200
+      API_KEY_SALT: ${API_KEY_SALT:-change-me-in-production}
+      ADMIN_SECRET: ${ADMIN_SECRET:-change-me-in-production}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nginx:
+    <<: *service-common
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
+    depends_on:
+      api_gateway:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+
+  # ─── Microservices ─────────────────────────────────────────────────────────
+
+  inventory_service:
+    <<: *service-common
+    <<: *logging-fluentd
+    build:
+      context: .
+      dockerfile: services/inventory/Dockerfile
+    depends_on:
+      fluentd:
+        condition: service_healthy
+    environment:
+      SERVICE_NAME: Inventory_Service
+
+  order_service:
+    <<: *service-common
+    <<: *logging-fluentd
+    build:
+      context: .
+      dockerfile: services/order/Dockerfile
+    depends_on:
+      fluentd:
+        condition: service_healthy
+    environment:
+      SERVICE_NAME: Order_Service
+
+  payment_service:
+    <<: *service-common
+    <<: *logging-fluentd
+    build:
+      context: .
+      dockerfile: services/payment/Dockerfile
+    depends_on:
+      fluentd:
+        condition: service_healthy
+    environment:
+      SERVICE_NAME: Payment_Service
+
+  shipping_service:
+    <<: *service-common
+    <<: *logging-fluentd
+    build:
+      context: .
+      dockerfile: services/shipping/Dockerfile
+    depends_on:
+      fluentd:
+        condition: service_healthy
+    environment:
+      SERVICE_NAME: Shipping_Service
+
+  # ─── Demo (optional ─── run with: docker compose --profile demo up) ───────────
+
+  demo:
+    <<: *service-common
+    build:
+      context: .
+      dockerfile: Dockerfile.demo
+    depends_on:
+      api_gateway:
+        condition: service_healthy
+    environment:
+      API_BASE_URL: http://api_gateway:8000
+    ports:
+      - "8501:8501"
+    profiles:
+      - demo
+
+volumes:
+  kafka_data:
+  es_data:

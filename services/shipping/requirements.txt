@@ -1,0 +1,2 @@
+fluent-logger==0.9.6
+aio-pika==9.4.3

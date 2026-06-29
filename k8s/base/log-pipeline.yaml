@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: log-pipeline
+  namespace: distributed-logs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: log-pipeline
+  template:
+    metadata:
+      labels:
+        app: log-pipeline
+    spec:
+      containers:
+        - name: log-pipeline
+          image: dls/log-pipeline:latest
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: kafka:9092
+            - name: ELASTICSEARCH_HOST
+              value: http://elasticsearch:9200
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"

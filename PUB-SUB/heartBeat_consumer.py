@@ -20,7 +20,7 @@ class Heartbeat:
         self.consumer = AIOKafkaConsumer(
             'heartbeat',  # Topic name
             loop=loop,
-            bootstrap_servers='kafka    :9092',
+            bootstrap_servers='kafka:9092',
             group_id='heartbeat-consumer-group',
             auto_offset_reset='earliest'  # Start reading messages from the earliest
         )
