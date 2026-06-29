@@ -38,9 +38,10 @@ class NodeStatusManager:
 
     async def delete(self, node_id: str) -> None:
         try:
-            await self.es.delete(index=INDEX, id=node_id, ignore=[404])
+            await self.es.delete(index=INDEX, id=node_id)
         except Exception as exc:
-            print(f"[node_status] delete error: {exc}")
+            if "404" not in str(exc):
+                print(f"[node_status] delete error: {exc}")
 
     async def close(self) -> None:
         await self.es.close()
