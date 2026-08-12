@@ -1,5 +1,3 @@
-version: "3.9"
-
 x-service-common: &service-common
   restart: unless-stopped
   env_file:
@@ -11,7 +9,7 @@ x-logging-fluentd: &logging-fluentd
     driver: fluentd
     options:
       fluentd-address: "localhost:9880"
-      fluentd-async-connect: "true"
+      fluentd-async: "true"
       tag: "docker.{{.Name}}"
 
 services:
@@ -23,7 +21,7 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
     healthcheck:
-      test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181 | grep imok"]
+      test: ["CMD", "bash", "-c", "echo srvr | nc localhost 2181 | grep -q Mode"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -86,7 +84,7 @@ services:
       - "9880:9880"
       - "24220:24220"
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:24220/api/plugins.json || exit 1"]
+      test: ["CMD", "ruby", "-rnet/http", "-ruri", "-e", "exit(Net::HTTP.get_response(URI('http://localhost:24220/api/plugins.json')).code == '200' ? 0 : 1)"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -140,8 +138,10 @@ services:
       ELASTICSEARCH_HOST: http://elasticsearch:9200
       API_KEY_SALT: ${API_KEY_SALT:-change-me-in-production}
       ADMIN_SECRET: ${ADMIN_SECRET:-change-me-in-production}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health',timeout=3).status==200 else 1)"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -161,8 +161,7 @@ services:
   # ─── Microservices ─────────────────────────────────────────────────────────
 
   inventory_service:
-    <<: *service-common
-    <<: *logging-fluentd
+    <<: [*service-common, *logging-fluentd]
     build:
       context: .
       dockerfile: services/inventory/Dockerfile
@@ -173,8 +172,7 @@ services:
       SERVICE_NAME: Inventory_Service
 
   order_service:
-    <<: *service-common
-    <<: *logging-fluentd
+    <<: [*service-common, *logging-fluentd]
     build:
       context: .
       dockerfile: services/order/Dockerfile
@@ -185,8 +183,7 @@ services:
       SERVICE_NAME: Order_Service
 
   payment_service:
-    <<: *service-common
-    <<: *logging-fluentd
+    <<: [*service-common, *logging-fluentd]
     build:
       context: .
       dockerfile: services/payment/Dockerfile
@@ -197,8 +194,7 @@ services:
       SERVICE_NAME: Payment_Service
 
   shipping_service:
-    <<: *service-common
-    <<: *logging-fluentd
+    <<: [*service-common, *logging-fluentd]
     build:
       context: .
       dockerfile: services/shipping/Dockerfile

@@ -9,12 +9,15 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
+// HeartbeatConsumer drains the heartbeat topic so it doesn't build up an
+// unconsumed backlog. It does NOT write node_status — heartbeat_service owns
+// that (it has the timeout-based failure detection logic); log_pipeline
+// writing the same doc caused active/failed to flap between the two writers.
 type HeartbeatConsumer struct {
-	reader  *kafka.Reader
-	storage *ElasticsearchStorage
+	reader *kafka.Reader
 }
 
-func NewHeartbeatConsumer(brokers []string, topic string, groupID string, storage *ElasticsearchStorage) *HeartbeatConsumer {
+func NewHeartbeatConsumer(brokers []string, topic string, groupID string) *HeartbeatConsumer {
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:        brokers,
 		GroupID:        groupID,
@@ -24,8 +27,7 @@ func NewHeartbeatConsumer(brokers []string, topic string, groupID string, storag
 	})
 
 	return &HeartbeatConsumer{
-		reader:  reader,
-		storage: storage,
+		reader: reader,
 	}
 }
 
@@ -60,24 +62,10 @@ func (c *HeartbeatConsumer) Consume(ctx context.Context) {
 			}
 
 			nodeID, _ := hbMsg["node_id"].(string)
-			serviceName, _ := hbMsg["service_name"].(string)
-			status, _ := hbMsg["status"].(string)
-
 			if nodeID == "" {
 				nodeID = "unknown"
 			}
-			if serviceName == "" {
-				serviceName = "unknown"
-			}
-
-			mappedStatus := "inactive"
-			if status == "UP" {
-				mappedStatus = "active"
-			}
-
-			if err := c.storage.UpsertNodeStatus(ctx, nodeID, serviceName, mappedStatus); err != nil {
-				log.Printf("[heartbeat_kafka] failed to upsert status: %v", err)
-			}
+			log.Printf("[heartbeat_kafka] received heartbeat from node %s", nodeID)
 
 			if err := c.reader.CommitMessages(ctx, msg); err != nil {
 				log.Printf("[heartbeat_kafka] error committing offset: %v", err)

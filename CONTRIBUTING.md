@@ -12,7 +12,7 @@ cd Distributed-Log-System
 pip install -r requirements.txt   # pylint, ruff, pytest, bandit, black
 
 # Start infrastructure only (skip microservices for faster iteration)
-docker compose up -d zookeeper kafka rabbitmq elasticsearch
+docker compose up -d zookeeper kafka elasticsearch
 ```
 
 ## Project Structure
@@ -22,7 +22,7 @@ docker compose up -d zookeeper kafka rabbitmq elasticsearch
 | `common/` | Shared library — config, log sender, heartbeat publisher, node ID |
 | `services/{name}/` | Individual microservices (import from `common/`) |
 | `log_pipeline/` | Kafka→Elasticsearch consumer pipeline |
-| `heartbeat_service/` | RabbitMQ consumer, failure detection, restart, webhooks |
+| `heartbeat_service/` | Kafka consumer, failure detection, restart, webhooks |
 | `api_gateway/` | FastAPI PaaS REST API |
 | `nginx/` | Reverse proxy config + Dockerfile |
 | `k8s/` | Kubernetes manifests (Kustomize base + overlays) |
@@ -62,7 +62,7 @@ bandit -r . -ll --exclude .venv,k8s
 2. Add `services/<name>/Dockerfile` and `requirements.txt`
 3. Add service to `docker-compose.yml`
 4. Add `k8s/base/services.yaml` Deployment entry
-5. Reuse `common/heartbeat.py` for dual-publish — do **not** re-implement heartbeat logic
+5. Reuse `common/heartbeat.py` for heartbeat publishing — do **not** re-implement heartbeat logic
 
 ## Reporting Bugs
 

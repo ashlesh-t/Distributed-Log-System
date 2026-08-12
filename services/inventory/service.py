@@ -60,12 +60,15 @@ async def generate_logs(node_id: str) -> None:
         elif level == "WARN":
             data["response_time_ms"] = random.randint(10, 100)
 
+        # "message" is a reserved LogRecord attribute — the formatter already
+        # emits it from the log call's msg argument, so it can't also be in extra.
+        extra = {k: v for k, v in data.items() if k != "message"}
         if level == "ERROR":
-            logger.error(data["message"], extra=data)
+            logger.error(data["message"], extra=extra)
         elif level == "WARN":
-            logger.warning(data["message"], extra=data)
+            logger.warning(data["message"], extra=extra)
         else:
-            logger.info(data["message"], extra=data)
+            logger.info(data["message"], extra=extra)
 
         await asyncio.sleep(random.uniform(0.1, 1.0))
 

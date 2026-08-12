@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"time"
 
 	"github.com/elastic/go-elasticsearch/v8"
@@ -159,39 +158,3 @@ func (s *ElasticsearchStorage) StoreLogs(ctx context.Context, logs []map[string]
 	return nil
 }
 
-func (s *ElasticsearchStorage) UpsertNodeStatus(ctx context.Context, nodeID string, serviceName string, status string) error {
-	doc := map[string]interface{}{
-		"node_id":      nodeID,
-		"service_name": serviceName,
-		"status":       status,
-		"updated_at":   time.Now().UTC().Format(time.RFC3339),
-	}
-
-	payload := map[string]interface{}{
-		"doc":           doc,
-		"doc_as_upsert": true,
-	}
-
-	bodyBytes, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-
-	req := esapi.UpdateRequest{
-		Index:      "node_status",
-		DocumentID: nodeID,
-		Body:       bytes.NewReader(bodyBytes),
-	}
-
-	res, err := req.Do(ctx, s.client)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-
-	if res.IsError() && res.StatusCode != http.StatusNotFound {
-		return fmt.Errorf("upsert node status failed: %s", res.String())
-	}
-
-	return nil
-}
