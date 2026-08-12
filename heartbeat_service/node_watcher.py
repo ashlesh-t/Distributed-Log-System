@@ -15,6 +15,7 @@ class NodeWatcher:
         self._last_seen: dict[str, datetime] = {}
         self._service_map: dict[str, str] = {}
         self._suspected: set[str] = set()
+        self._known: set[str] = set()
         self._ns = NodeStatusManager()
         self._restarter = RestartHandler()
         self._webhooks = WebhookNotifier()
@@ -26,6 +27,11 @@ class NodeWatcher:
             if node_id in self._suspected:
                 self._suspected.discard(node_id)
                 asyncio.create_task(self._mark_recovered(node_id, service_name))
+            elif node_id not in self._known:
+                # First heartbeat seen from this node — record it as active so
+                # GET /v1/nodes shows it without waiting for a failure/recovery cycle.
+                self._known.add(node_id)
+                asyncio.create_task(self._ns.upsert(node_id, service_name, "active"))
         elif status == "DOWN":
             asyncio.create_task(self._mark_failed(node_id, service_name, graceful=True))
 

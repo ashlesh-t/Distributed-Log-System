@@ -1,109 +1,103 @@
 # Getting Started with Distributed Log System (DLS)
 
-This guide walks you through installing the `dls` CLI tool, initializing your PaaS environment, configuring log topics, and integrating structured JSON logging into your applications.
+This guide walks you through configuring and starting the DLS stack with Docker Compose, and integrating structured JSON logging into your own applications.
 
 ---
 
-## 1. Installation
+## 1. Prerequisites
 
-Install the DLS CLI command-line manager via your system's package manager.
+- Docker and Docker Compose v2 (`docker compose version`)
 
-### macOS & Linux (Homebrew)
-```bash
-brew tap ashlesh/dls
-brew install dls
-```
-
-### Arch Linux (AUR via Yay)
-```bash
-yay -S dls-cli
-```
+No other local toolchain is required — Python and Go services all build inside their containers.
 
 ---
 
-## 2. Initialization & Configuration Wizard
+## 2. Configuration
 
-Once installed, initialize your local configuration profile by running:
+Copy the example environment file and fill in real values:
 
 ```bash
-dls init
+cp .env.example .env
 ```
 
-The terminal setup wizard will guide you through all necessary configurations:
+At minimum, set `API_KEY_SALT` and `ADMIN_SECRET` to random values instead of the `change-me-in-production` defaults:
 
-1. **Deploy Model**: Choose between `Local` (Docker Compose development environment) or `Cloud` (Managed AWS/GCP services).
-2. **Standard Log Topics**: Define your active logging channels. By default, the system initiates `logs` and `heartbeat`.
-3. **Custom Topics**: Add extra log topics as a comma-separated list (e.g. `audit, payments, shipping`).
-4. **Wiring Details**: For each custom topic, you will be prompted for:
-   * **Topic Name**: (e.g., `payments`)
-   * **Short Description**: (e.g., `Credit card transactions and gateway payloads`)
-5. **Connection Settings**:
-   * **Kafka Broker Addresses**: Default: `localhost:9092`
-   * **Elasticsearch/OpenSearch URL**: Default: `http://localhost:9200`
-   * **Restart Handler Backend**: `docker` or `kubernetes`
+```bash
+python -c "import secrets; print(secrets.token_hex(32))"
+```
 
-The wizard generates your configuration profile at `~/.dls/config.yaml` and prepares the dynamic configuration files (such as Fluent Bit filters and Elasticsearch mapping templates).
+Other settings in `.env` (all optional, sensible defaults are pre-filled):
+
+* **`RESTART_BACKEND`**: `docker` (local Docker-based restart) or `kubernetes` (K8s pod restart)
+* **`K8S_NAMESPACE`**: only used when `RESTART_BACKEND=kubernetes`
+* **`WEBHOOK_URL`** / **`WEBHOOK_SECRET`**: if set, `heartbeat_service` POSTs `node_down`/`node_up` events there, HMAC-signed
+* **`HEARTBEAT_INTERVAL_SECONDS`** / **`HEARTBEAT_TIMEOUT_SECONDS`**: how often services heartbeat and how long before a missed node is marked failed
 
 ---
 
 ## 3. Starting the Local Log Pipeline
 
-For local PaaS orchestration using Docker containers:
-
 ```bash
-# Start all pipeline services (Zookeeper, Kafka, Elasticsearch, Fluent Bit, API Gateway)
-dls start --local
+# Start the full stack: Zookeeper, Kafka, Elasticsearch, Kibana, Fluentd,
+# log_pipeline, heartbeat_service, api_gateway, nginx, and demo microservices
+docker compose up -d --build
 
 # Verify all services are healthy
-dls status
+docker compose ps
+```
+
+To iterate faster on just the microservices, start infrastructure only first:
+
+```bash
+docker compose up -d zookeeper kafka elasticsearch
 ```
 
 ---
 
 ## 4. Connecting Your Applications (Structured JSON Logging)
 
-To stay decoupled from Fluent Bit, your services must write structured JSON messages directly to standard output (`stdout`).
+To stay decoupled from Fluentd, your services must write structured JSON messages directly to standard output (`stdout`). This repo ships a ready-to-use JSON formatter in `common/logger.py` — reuse it rather than adding a new logging dependency.
 
 ### Python JSON Logging Example
-First, install the python JSON logging library:
-```bash
-pip install python-json-logger
-```
 
-Configure your logger in python:
 ```python
-import logging
-import sys
-from pythonjsonlogger import jsonlogger
+from common.logger import get_json_logger
 
-# Initialize logging to stdout
-logHandler = logging.StreamHandler(sys.stdout)
-formatter = jsonlogger.JsonFormatter(
-    fmt='%(asctime)s %(levelname)s %(name)s %(message)s'
-)
-logHandler.setFormatter(formatter)
+logger = get_json_logger("order_service")
 
-logger = logging.getLogger("order_service")
-logger.addHandler(logHandler)
-logger.setLevel(logging.INFO)
-
-# Emit a log - Fluent Bit automatically parses and ships this JSON to Kafka -> ES
+# Emit a log — Fluentd automatically parses and ships this JSON to Kafka -> ES
 logger.info("Order placed successfully", extra={
     "node_id": "node-abc123",
     "service_name": "Order_Service",
+    "message_type": "LOG",
     "order_id": "ord-88390",
-    "amount": 99.95
+    "amount": 99.95,
 })
 ```
+
+See `services/order/service.py` for a complete example, including heartbeat publishing via `common/heartbeat.py`.
 
 ---
 
 ## 5. Launching the Control Dashboard
 
-Open the Streamlit dashboard locally to view node health, query logs, and manage alerts:
+The Streamlit dashboard is included as an optional Compose profile:
 
 ```bash
-dls dashboard
+docker compose --profile demo up -d demo
 ```
 
-The control UI is available at `http://localhost:8501`.
+The control UI is available at `http://localhost:8501`. It talks to the `api_gateway` REST API — set your API key in the sidebar to authenticate.
+
+---
+
+## 6. Browsing Logs in Kibana
+
+Elasticsearch and Kibana are included in the stack for manual inspection:
+
+```bash
+# Kibana is available at:
+open http://localhost:5601
+```
+
+Logs are indexed under the `distributed_logs-*` pattern; node health is in the `node_status` index.

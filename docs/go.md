@@ -44,10 +44,9 @@ To support high-throughput log ingestion and horizontal scalability, the core pi
   2. The flush timer fires (every `1` second) to ensure low-latency visibility for sparse log volumes.
 * Commits Kafka offsets only after successful Elasticsearch responses to guarantee at-least-once delivery.
 
-### Health Tracker (`consumer_heartbeat.go`)
-* Consumes from the Kafka `heartbeat` topic.
-* Parses heartbeat states and instantly triggers an upsert request on the `node_status` index in Elasticsearch.
-* If a node is `UP`, its status is updated to `active`; otherwise, it is marked as `inactive`.
+### Heartbeat Drain (`consumer_heartbeat.go`)
+* Consumes from the Kafka `heartbeat` topic and commits offsets so the topic doesn't build up a backlog.
+* Does **not** write to the `node_status` index — that's owned exclusively by `heartbeat_service`, which has the timeout-based failure detection logic needed to decide `active` vs. `failed`. Having both services independently upsert the same document caused the status to flap between writers.
 
 ---
 
