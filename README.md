@@ -8,7 +8,7 @@
 
 DLS eliminates client-side coupling by utilizing a **decoupled log shipping pattern**. Microservices publish structured JSON logs directly to standard output (`stdout`), where a low-overhead collector (Fluentd) tails, parses, and pushes them to **Kafka**. An ingestion pipeline then consumes the logs in bulk and writes them to **Elasticsearch**.
 
-For detailed system diagrams and component logs, see [architecture.md](file:///home/ashlesh/my_works/Distributed-Log-System/docs/architecture.md).
+For detailed system diagrams and component logs, see [architecture.md](docs/architecture.md).
 
 ---
 
@@ -41,26 +41,26 @@ docker compose ps
 curl http://localhost:8000/health
 ```
 
-For a comprehensive walkthrough, follow the [Getting Started Guide](file:///home/ashlesh/my_works/Distributed-Log-System/getting_started.md).
+For a comprehensive walkthrough, follow the [Getting Started Guide](getting_started.md).
 
 ---
 
 ## Documentation Index
 
-* **Installation & Integration**: [getting_started.md](file:///home/ashlesh/my_works/Distributed-Log-System/getting_started.md)
-* **Design & Infrastructure**: [docs/architecture.md](file:///home/ashlesh/my_works/Distributed-Log-System/docs/architecture.md)
-* **Security & Production Hardening**: [SECURITY.md](file:///home/ashlesh/my_works/Distributed-Log-System/SECURITY.md)
-* **API Endpoints Reference**: [docs/api-reference.md](file:///home/ashlesh/my_works/Distributed-Log-System/docs/api-reference.md)
-* **Open Source License**: [LICENSE](file:///home/ashlesh/my_works/Distributed-Log-System/LICENSE)
+* **Installation & Integration**: [getting_started.md](getting_started.md)
+* **Design & Infrastructure**: [docs/architecture.md](docs/architecture.md)
+* **Security & Production Hardening**: [SECURITY.md](SECURITY.md)
+* **API Endpoints Reference**: [docs/api-reference.md](docs/api-reference.md)
+* **Open Source License**: [LICENSE](LICENSE)
 
 ---
 
 ## Contributing
 
-Please read [CONTRIBUTING.md](file:///home/ashlesh/my_works/Distributed-Log-System/CONTRIBUTING.md) before opening pull requests.
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening pull requests.
 
 ---
 
 ## License
 
-Distributed under the MIT License. See [LICENSE](file:///home/ashlesh/my_works/Distributed-Log-System/LICENSE) for more details.
+Distributed under the MIT License. See [LICENSE](LICENSE) for more details.
