@@ -48,7 +48,7 @@ func main() {
 
 	// Start consumers
 	logConsumer := NewLogConsumer(brokers, "logs", "log-consumer-group", storage, bufferSize)
-	hbConsumer := NewHeartbeatConsumer(brokers, "heartbeat", "heartbeat-storage-group")
+	hbConsumer := NewHeartbeatConsumer(brokers, "heartbeat", "heartbeat-storage-group", storage)
 
 	// Run goroutines
 	go logConsumer.Consume(ctx)

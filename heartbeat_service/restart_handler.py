@@ -19,7 +19,19 @@ class RestartHandler:
             name = os.environ.get(
                 f"CONTAINER_{node_id.replace('-', '_')}", service_name.lower()
             )
-            container = client.containers.get(name)
+            # Try the configured/bare name first (works when container_name is set
+            # in docker-compose.yml).  Fall back to a partial-name scan to handle
+            # Docker Compose project-prefixed names like "project-service-1".
+            try:
+                container = client.containers.get(name)
+            except Exception:
+                matches = [
+                    c for c in client.containers.list()
+                    if any(name in n for n in c.names)
+                ]
+                if not matches:
+                    raise RuntimeError(f"No container found matching '{name}'")
+                container = matches[0]
             container.restart(timeout=10)
             print(f"[restart] Docker restarted container '{name}'")
         except Exception as exc:
