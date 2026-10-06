@@ -157,4 +157,3 @@ func (s *ElasticsearchStorage) StoreLogs(ctx context.Context, logs []map[string]
 
 	return nil
 }
-
