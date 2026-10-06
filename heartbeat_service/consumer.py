@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+
 from aiokafka import AIOKafkaConsumer
 
 from heartbeat_service.node_watcher import NodeWatcher

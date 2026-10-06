@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timezone
+
 from elasticsearch import AsyncElasticsearch
 
 INDEX = "node_status"

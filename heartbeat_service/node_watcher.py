@@ -2,9 +2,9 @@ import asyncio
 import os
 from datetime import datetime, timezone
 
+from heartbeat_service.node_status import NodeStatusManager
 from heartbeat_service.restart_handler import RestartHandler
 from heartbeat_service.webhook_notifier import WebhookNotifier
-from heartbeat_service.node_status import NodeStatusManager
 
 TIMEOUT = float(os.environ.get("HEARTBEAT_TIMEOUT_SECONDS", "15"))
 CHECK_INTERVAL = 2.0

@@ -26,7 +26,8 @@ class RestartHandler:
                 container = client.containers.get(name)
             except Exception:
                 matches = [
-                    c for c in client.containers.list()
+                    c
+                    for c in client.containers.list()
                     if any(name in n for n in c.names)
                 ]
                 if not matches:
@@ -39,8 +40,10 @@ class RestartHandler:
 
     async def _restart_k8s(self, service_name: str) -> None:
         try:
-            from kubernetes import client as k8s_client, config as k8s_config  # type: ignore
             from datetime import datetime, timezone
+
+            from kubernetes import client as k8s_client  # type: ignore
+            from kubernetes import config as k8s_config
 
             try:
                 k8s_config.load_incluster_config()

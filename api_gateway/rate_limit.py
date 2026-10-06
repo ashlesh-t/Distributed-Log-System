@@ -29,7 +29,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             # Starlette to return HTTP 500 instead of the intended 429.
             return JSONResponse(
                 status_code=429,
-                content={"detail": "Rate limit exceeded — 100 requests per minute per API key"},
+                content={
+                    "detail": "Rate limit exceeded — 100 requests per minute per API key"
+                },
                 headers={"Retry-After": str(WINDOW_SECONDS)},
             )
 

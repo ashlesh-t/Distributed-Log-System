@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, timezone
+
 from common.logger import get_json_logger
 
 logger = get_json_logger("heartbeat")
