@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 
-from api_gateway.auth import verify_admin, create_api_key, delete_api_key
+from api_gateway.auth import create_api_key, delete_api_key, verify_admin
 from api_gateway.schemas import AdminKeyCreate, AdminKeyResponse
 
 router = APIRouter(prefix="/admin", tags=["admin"])

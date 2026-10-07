@@ -19,7 +19,18 @@ class RestartHandler:
             name = os.environ.get(
                 f"CONTAINER_{node_id.replace('-', '_')}", service_name.lower()
             )
-            container = client.containers.get(name)
+            # Try the configured/bare name first (works when container_name is set
+            # in docker-compose.yml).  Fall back to a partial-name scan to handle
+            # Docker Compose project-prefixed names like "project-service-1".
+            try:
+                container = client.containers.get(name)
+            except Exception:
+                # Use Docker's native filtering for performance instead of fetching all
+                # containers and doing string matching in Python.
+                matches = client.containers.list(filters={"name": name})
+                if not matches:
+                    raise RuntimeError(f"No container found matching '{name}'")
+                container = matches[0]
             container.restart(timeout=10)
             print(f"[restart] Docker restarted container '{name}'")
         except Exception as exc:
@@ -27,8 +38,10 @@ class RestartHandler:
 
     async def _restart_k8s(self, service_name: str) -> None:
         try:
-            from kubernetes import client as k8s_client, config as k8s_config  # type: ignore
             from datetime import datetime, timezone
+
+            from kubernetes import client as k8s_client  # type: ignore
+            from kubernetes import config as k8s_config
 
             try:
                 k8s_config.load_incluster_config()

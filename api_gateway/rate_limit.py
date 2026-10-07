@@ -1,8 +1,9 @@
 import time
 from collections import defaultdict, deque
 
-from fastapi import Request, HTTPException, status
+from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 
 WINDOW_SECONDS = 60
 MAX_REQUESTS = 100
@@ -23,9 +24,14 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             window.popleft()
 
         if len(window) >= MAX_REQUESTS:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Rate limit exceeded — 100 requests per minute per API key",
+            # NOTE: Must return JSONResponse here — raising HTTPException inside
+            # BaseHTTPMiddleware bypasses FastAPI's exception handlers and causes
+            # Starlette to return HTTP 500 instead of the intended 429.
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "detail": "Rate limit exceeded — 100 requests per minute per API key"
+                },
                 headers={"Retry-After": str(WINDOW_SECONDS)},
             )
 

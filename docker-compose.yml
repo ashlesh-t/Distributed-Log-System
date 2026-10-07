@@ -134,6 +134,8 @@ services:
     depends_on:
       elasticsearch:
         condition: service_healthy
+    ports:
+      - "8000:8000"
     environment:
       ELASTICSEARCH_HOST: http://elasticsearch:9200
       API_KEY_SALT: ${API_KEY_SALT:-change-me-in-production}
@@ -162,6 +164,7 @@ services:
 
   inventory_service:
     <<: [*service-common, *logging-fluentd]
+    container_name: inventory_service
     build:
       context: .
       dockerfile: services/inventory/Dockerfile
@@ -173,6 +176,7 @@ services:
 
   order_service:
     <<: [*service-common, *logging-fluentd]
+    container_name: order_service
     build:
       context: .
       dockerfile: services/order/Dockerfile
@@ -184,6 +188,7 @@ services:
 
   payment_service:
     <<: [*service-common, *logging-fluentd]
+    container_name: payment_service
     build:
       context: .
       dockerfile: services/payment/Dockerfile
@@ -195,6 +200,7 @@ services:
 
   shipping_service:
     <<: [*service-common, *logging-fluentd]
+    container_name: shipping_service
     build:
       context: .
       dockerfile: services/shipping/Dockerfile

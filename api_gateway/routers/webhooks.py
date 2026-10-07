@@ -1,6 +1,7 @@
 import secrets
-from fastapi import APIRouter, Depends, HTTPException
+
 import httpx
+from fastapi import APIRouter, Depends, HTTPException
 
 from api_gateway.auth import verify_api_key
 from api_gateway.elastic_client import get_es

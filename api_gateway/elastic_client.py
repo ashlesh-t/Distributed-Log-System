@@ -1,4 +1,5 @@
 import os
+
 from elasticsearch import AsyncElasticsearch
 
 _es: AsyncElasticsearch | None = None

@@ -1,10 +1,11 @@
+import os
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from api_gateway.auth import verify_api_key
 from api_gateway.elastic_client import get_es
 from api_gateway.schemas import NodeInfo, NodesResponse, RestartResponse
 from heartbeat_service.restart_handler import RestartHandler
-import os
 
 router = APIRouter(prefix="/v1/nodes", tags=["nodes"])
 _restarter = RestartHandler()
