@@ -25,11 +25,9 @@ class RestartHandler:
             try:
                 container = client.containers.get(name)
             except Exception:
-                matches = [
-                    c
-                    for c in client.containers.list()
-                    if any(name in n for n in c.names)
-                ]
+                # Use Docker's native filtering for performance instead of fetching all
+                # containers and doing string matching in Python.
+                matches = client.containers.list(filters={"name": name})
                 if not matches:
                     raise RuntimeError(f"No container found matching '{name}'")
                 container = matches[0]
