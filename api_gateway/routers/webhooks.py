@@ -42,7 +42,14 @@ async def list_webhooks(key_meta: dict = Depends(verify_api_key)):
 async def delete_webhook(webhook_id: str, key_meta: dict = Depends(verify_api_key)):
     es = get_es()
     try:
+        doc = await es.get(index=WEBHOOK_INDEX, id=webhook_id)
+        if doc["_source"].get("owner_key_id") != key_meta.get("key_id"):
+            raise HTTPException(
+                status_code=403, detail="Not authorized to delete this webhook"
+            )
         await es.delete(index=WEBHOOK_INDEX, id=webhook_id)
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=404, detail="Webhook not found")
 
