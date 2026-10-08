@@ -39,7 +39,7 @@ async def verify_api_key(x_api_key: str = Header(...)) -> dict:
 
 
 def verify_admin(x_admin_secret: str = Header(...)) -> None:
-    if x_admin_secret != ADMIN_SECRET:
+    if not secrets.compare_digest(x_admin_secret, ADMIN_SECRET):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Invalid admin secret"
         )

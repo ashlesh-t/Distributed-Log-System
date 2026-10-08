@@ -102,9 +102,11 @@ async def log_stats(
 @router.get("/{log_id}", response_model=LogEntry)
 async def get_log(log_id: str, key_meta: dict = Depends(verify_api_key)):
     es = get_es()
+    must = _tenant_filter(key_meta)
+    must.append({"term": {"log_id": log_id}})
     resp = await es.search(
         index="distributed_logs-*",
-        body={"query": {"term": {"log_id": log_id}}, "size": 1},
+        body={"query": {"bool": {"filter": must}}, "size": 1},
     )
     hits = resp["hits"]["hits"]
     if not hits:
