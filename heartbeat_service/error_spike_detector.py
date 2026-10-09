@@ -25,6 +25,9 @@ class ErrorSpikeDetector:
             await asyncio.sleep(CHECK_INTERVAL)
             try:
                 await self._check()
+            except asyncio.CancelledError:
+                print("[error_spike] Spike detector shutting down")
+                raise
             except Exception as e:
                 print(f"[error_spike] check failed: {e}")
 
