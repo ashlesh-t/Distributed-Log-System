@@ -326,8 +326,9 @@ with tab5:
                     res = api_post(f"/v1/webhooks/{wh['webhook_id']}/test")
                     if res:
                         st.info(f"Test sent — HTTP {res.get('status_code', 'err')}")
-                if col4.button("Delete", key=f"del_{wh['webhook_id']}"):
-                    if api_delete(f"/v1/webhooks/{wh['webhook_id']}"):
+                if col4.button("Delete", key=f"del_{wh['webhook_id']}") and api_delete(
+                    f"/v1/webhooks/{wh['webhook_id']}"
+                ):
                         st.success("Deleted")
                         st.rerun()
         else:

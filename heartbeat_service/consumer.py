@@ -4,6 +4,7 @@ import os
 
 from aiokafka import AIOKafkaConsumer
 
+from heartbeat_service.error_spike_detector import ErrorSpikeDetector
 from heartbeat_service.node_watcher import NodeWatcher
 
 KAFKA_SERVERS = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
@@ -12,6 +13,9 @@ KAFKA_SERVERS = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
 async def main() -> None:
     watcher = NodeWatcher()
     asyncio.create_task(watcher.watch_loop())
+
+    spike_detector = ErrorSpikeDetector()
+    asyncio.create_task(spike_detector.detect_loop())
 
     for attempt in range(10):
         try:

@@ -21,7 +21,7 @@ You will receive a response within 72 hours. We follow responsible disclosure â€
 
 ### Decoupled Logging Security
 - **No Direct Socket Access**: Microservices do not establish connections to Fluentd. This removes network access requirements and credential configurations from microservice namespaces.
-- **Log Sanitation**: The log aggregation daemon (Fluent Bit) can be configured to strip out sensitive data (credit cards, passwords) using regex filters before writing logs to Kafka.
+- **Log Sanitation**: Data masking is not enabled by default. You can configure Fluentd (or Fluent Bit) to strip out sensitive data (credit cards, passwords) using `record_transformer` or regex filters before writing logs to Kafka.
 
 ### API Authentication
 - All `/v1/*` API endpoints require the `X-API-Key` header.
