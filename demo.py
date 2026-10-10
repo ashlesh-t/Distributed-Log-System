@@ -136,7 +136,11 @@ with tab1:
         for i, node in enumerate(nodes):
             col = cols[i % len(cols)]
             status = node.get("status", "unknown")
-            color = "[ACTIVE]" if status == "active" else "[FAILED]" if status == "failed" else "[UNKNOWN]"
+            color = (
+                "[ACTIVE]"
+                if status == "active"
+                else "[FAILED]" if status == "failed" else "[UNKNOWN]"
+            )
             col.markdown(
                 f"{color} **{node.get('service_name', node['node_id'][:8])}**  \n"
                 f"`{node['node_id'][:12]}...`  \n"
