@@ -121,6 +121,9 @@ services:
       RESTART_BACKEND: docker
       HEARTBEAT_TIMEOUT_SECONDS: "15"
       WEBHOOK_URL: ${WEBHOOK_URL:-}
+      ERROR_SPIKE_THRESHOLD: "0.50"
+      ERROR_SPIKE_MIN_SAMPLES: "10"
+      ERROR_SPIKE_WINDOW_SECONDS: "60"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 
