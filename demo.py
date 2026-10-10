@@ -1,5 +1,5 @@
 """
-Distributed Log System — PaaS Demo & Control Panel
+Distributed Log System - PaaS Demo & Control Panel
 Run: streamlit run demo.py
 """
 
@@ -11,17 +11,17 @@ import httpx
 import pandas as pd
 import streamlit as st
 
-# ── Page config ───────────────────────────────────────────────────────────────
+# -- Page config ---------------------------------------------------------------
 st.set_page_config(
     page_title="Distributed Log System",
-    page_icon="📡",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# ── Sidebar ───────────────────────────────────────────────────────────────────
+# -- Sidebar -------------------------------------------------------------------
 with st.sidebar:
-    st.title("📡 DLS PaaS")
+    st.title("DLS PaaS")
     api_base = st.text_input(
         "API Base URL", value=os.environ.get("API_BASE_URL", "http://localhost:8000")
     )
@@ -41,9 +41,9 @@ with st.sidebar:
 
     connected = check_connection()
     if connected:
-        st.success("● Connected")
+        st.success("Connected")
     else:
-        st.error("● Disconnected")
+        st.error("Disconnected")
 
     auto_refresh = st.toggle("Auto-refresh", value=True)
     refresh_interval = st.slider("Refresh interval (s)", 2, 30, 5)
@@ -52,7 +52,7 @@ with st.sidebar:
     st.caption("Distributed Log System v1.0.0")
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# -- Helpers -------------------------------------------------------------------
 HEADERS = {"X-API-Key": st.session_state.get("api_key", "")}
 
 
@@ -85,21 +85,21 @@ def api_delete(path: str):
         return False
 
 
-# ── Tabs ──────────────────────────────────────────────────────────────────────
+# -- Tabs ----------------------------------------------------------------------
 tab1, tab2, tab3, tab4, tab5 = st.tabs(
     [
-        "🖥 System Overview",
-        "📋 Live Log Stream",
-        "💓 Node Health",
-        "📊 Analytics",
-        "⚙ Configuration",
+        "System Overview",
+        "Live Log Stream",
+        "Node Health",
+        "Analytics",
+        "Configuration",
     ]
 )
 
 
-# ════════════════════════════════════════════════════════════════════════════
-# Tab 1 — System Overview
-# ════════════════════════════════════════════════════════════════════════════
+# ============================================================================
+# Tab 1 - System Overview
+# ============================================================================
 with tab1:
     st.header("System Overview")
 
@@ -136,7 +136,7 @@ with tab1:
         for i, node in enumerate(nodes):
             col = cols[i % len(cols)]
             status = node.get("status", "unknown")
-            color = "🟢" if status == "active" else "🔴" if status == "failed" else "⚪"
+            color = "[ACTIVE]" if status == "active" else "[FAILED]" if status == "failed" else "[UNKNOWN]"
             col.markdown(
                 f"{color} **{node.get('service_name', node['node_id'][:8])}**  \n"
                 f"`{node['node_id'][:12]}...`  \n"
@@ -148,9 +148,9 @@ with tab1:
         st.rerun()
 
 
-# ════════════════════════════════════════════════════════════════════════════
-# Tab 2 — Live Log Stream
-# ════════════════════════════════════════════════════════════════════════════
+# ============================================================================
+# Tab 2 - Live Log Stream
+# ============================================================================
 with tab2:
     st.header("Live Log Stream")
 
@@ -218,9 +218,9 @@ with tab2:
         st.rerun()
 
 
-# ════════════════════════════════════════════════════════════════════════════
-# Tab 3 — Node Health
-# ════════════════════════════════════════════════════════════════════════════
+# ============================================================================
+# Tab 3 - Node Health
+# ============================================================================
 with tab3:
     st.header("Node Health")
 
@@ -231,7 +231,7 @@ with tab3:
             st.info("No nodes registered yet.")
         else:
             node_options = {
-                f"{n.get('service_name', n['node_id'])} — {n['node_id'][:12]}": n[
+                f"{n.get('service_name', n['node_id'])} - {n['node_id'][:12]}": n[
                     "node_id"
                 ]
                 for n in nodes
@@ -257,7 +257,7 @@ with tab3:
                     st.line_chart(df_hb.set_index("timestamp")["up"], height=200)
 
             st.divider()
-            if st.button("🔄 Trigger Restart", type="primary"):
+            if st.button("Trigger Restart", type="primary"):
                 result = api_post(f"/v1/nodes/{selected_id}/restart")
                 if result:
                     st.success(
@@ -267,9 +267,9 @@ with tab3:
                     st.error("Restart failed")
 
 
-# ════════════════════════════════════════════════════════════════════════════
-# Tab 4 — Analytics
-# ════════════════════════════════════════════════════════════════════════════
+# ============================================================================
+# Tab 4 - Analytics
+# ============================================================================
 with tab4:
     st.header("Analytics")
 
@@ -307,9 +307,9 @@ with tab4:
             st.bar_chart(df_svc.set_index("Service"))
 
 
-# ════════════════════════════════════════════════════════════════════════════
-# Tab 5 — Configuration
-# ════════════════════════════════════════════════════════════════════════════
+# ============================================================================
+# Tab 5 - Configuration
+# ============================================================================
 with tab5:
     st.header("Configuration")
 
@@ -325,12 +325,12 @@ with tab5:
                 if col3.button("Test", key=f"test_{wh['webhook_id']}"):
                     res = api_post(f"/v1/webhooks/{wh['webhook_id']}/test")
                     if res:
-                        st.info(f"Test sent — HTTP {res.get('status_code', 'err')}")
+                        st.info(f"Test sent - HTTP {res.get('status_code', 'err')}")
                 if col4.button("Delete", key=f"del_{wh['webhook_id']}") and api_delete(
                     f"/v1/webhooks/{wh['webhook_id']}"
                 ):
-                        st.success("Deleted")
-                        st.rerun()
+                    st.success("Deleted")
+                    st.rerun()
         else:
             st.info("No webhooks registered.")
 
