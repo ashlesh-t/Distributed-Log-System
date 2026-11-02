@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 )
 
@@ -51,8 +52,10 @@ func main() {
 	hbConsumer := NewHeartbeatConsumer(brokers, "heartbeat", "heartbeat-storage-group")
 
 	// Run goroutines
-	go logConsumer.Consume(ctx)
-	go hbConsumer.Consume(ctx)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() { defer wg.Done(); logConsumer.Consume(ctx) }()
+	go func() { defer wg.Done(); hbConsumer.Consume(ctx) }()
 
 	// Handle os signal termination gracefully
 	sigs := make(chan os.Signal, 1)
@@ -62,6 +65,7 @@ func main() {
 	log.Printf("[log_pipeline] received termination signal: %v. Initiating graceful shutdown...", sig)
 	cancel()
 
-	// Wait briefly for goroutines to clean up and commit
+	// Wait for consumers to perform their final flush and commit
+	wg.Wait()
 	log.Println("[log_pipeline] shutdown complete")
 }
