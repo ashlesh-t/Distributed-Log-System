@@ -16,6 +16,7 @@ class NodeWatcher:
         self._service_map: dict[str, str] = {}
         self._suspected: set[str] = set()
         self._known: set[str] = set()
+        self._failed: set[str] = set()
         self._ns = NodeStatusManager()
         self._restarter = RestartHandler()
         self._webhooks = WebhookNotifier()
@@ -24,15 +25,28 @@ class NodeWatcher:
         if status in ("UP", "HEARTBEAT"):
             self._last_seen[node_id] = datetime.now(timezone.utc)
             self._service_map[node_id] = service_name
-            if node_id in self._suspected:
+            if node_id in self._failed:
+                # Node was declared down (crash or graceful stop) and is back.
+                self._failed.discard(node_id)
                 self._suspected.discard(node_id)
+                self._known.add(node_id)
                 asyncio.create_task(self._mark_recovered(node_id, service_name))
+            elif node_id in self._suspected:
+                # Missed a check but never declared down: no node_down was sent,
+                # so there is nothing to recover from.
+                self._suspected.discard(node_id)
             elif node_id not in self._known:
                 # First heartbeat seen from this node — record it as active so
                 # GET /v1/nodes shows it without waiting for a failure/recovery cycle.
                 self._known.add(node_id)
                 asyncio.create_task(self._ns.upsert(node_id, service_name, "active"))
         elif status == "DOWN":
+            if node_id in self._failed:
+                return
+            # Stop timeout tracking, otherwise the watch loop would later declare
+            # this gracefully stopped node failed again and try to restart it.
+            self._last_seen.pop(node_id, None)
+            self._suspected.discard(node_id)
             asyncio.create_task(self._mark_failed(node_id, service_name, graceful=True))
 
     async def _mark_recovered(self, node_id: str, service_name: str) -> None:
@@ -44,6 +58,7 @@ class NodeWatcher:
         self, node_id: str, service_name: str, graceful: bool = False
     ) -> None:
         event = "node_down"
+        self._failed.add(node_id)
         print(f"[watcher] {node_id} ({service_name}) DOWN (graceful={graceful})")
         await self._ns.upsert(node_id, service_name, "failed")
         if not graceful:
