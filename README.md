@@ -38,7 +38,8 @@ This starts Zookeeper, Kafka, Elasticsearch, Kibana, Fluentd, the Go `log_pipeli
 ### 3. Verify it's running
 ```bash
 docker compose ps
-curl http://localhost:8000/health
+# nginx terminates TLS with a self-signed cert locally (hence -k); port 80 redirects to 443
+curl -k https://localhost/health
 ```
 
 For a comprehensive walkthrough, follow the [Getting Started Guide](getting_started.md).

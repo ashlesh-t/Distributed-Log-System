@@ -20,6 +20,12 @@ services:
     image: confluentinc/cp-zookeeper:7.5.0
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
+    # Persist ZooKeeper state alongside kafka_data. Kafka stores the cluster ID
+    # in both places; if only Kafka's survives a recreate, the broker refuses to
+    # start (InconsistentClusterIdException).
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_log:/var/lib/zookeeper/log
     healthcheck:
       test: ["CMD", "bash", "-c", "echo srvr | nc localhost 2181 | grep -q Mode"]
       interval: 10s
@@ -222,5 +228,7 @@ services:
       - demo
 
 volumes:
+  zookeeper_data:
+  zookeeper_log:
   kafka_data:
   es_data:

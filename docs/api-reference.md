@@ -1,7 +1,7 @@
 # API Reference — Distributed Log System PaaS
 
-**Base URL:** `https://your-host` (production) | `http://localhost:8000` (local)  
-**Interactive docs:** `http://localhost:8000/docs` (Swagger UI) | `http://localhost:8000/redoc` (ReDoc)
+**Base URL:** `https://your-host` (production) | `https://localhost` (local, via nginx; self-signed cert, use `curl -k`)  
+**Interactive docs:** `https://localhost/docs` (Swagger UI) | `https://localhost/redoc` (ReDoc)
 
 ---
 
