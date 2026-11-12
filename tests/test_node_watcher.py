@@ -83,7 +83,7 @@ def test_suspected_node_that_returns_sends_no_node_up():
         w._suspected.add("n1")
         w.update("n1", "svc", "UP")
         await settle()
-        assert w._webhooks.events == []
+        assert not w._webhooks.events
         assert "n1" not in w._suspected
 
     asyncio.run(scenario())
@@ -104,7 +104,7 @@ def test_graceful_down_is_not_restarted_later():
         if "n1" in w._last_seen:
             await expire(w, "n1")
         await settle()
-        assert w._restarter.restarted == []
+        assert not w._restarter.restarted
         assert w._webhooks.events.count(("n1", "node_down")) == 1
 
     asyncio.run(scenario())
