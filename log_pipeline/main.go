@@ -11,6 +11,15 @@ import (
 	"syscall"
 )
 
+func envInt(name string, def int) int {
+	if v := os.Getenv(name); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return def
+}
+
 func main() {
 	log.Println("[log_pipeline] starting Go pipeline daemon...")
 
@@ -33,8 +42,12 @@ func main() {
 		}
 	}
 
+	// Shard/replica counts for newly created indices (one index per node_id).
+	shards := envInt("ES_NUMBER_OF_SHARDS", 3)
+	replicas := envInt("ES_NUMBER_OF_REPLICAS", 1)
+
 	// Initialize Elasticsearch storage
-	storage, err := NewElasticsearchStorage(esHost)
+	storage, err := NewElasticsearchStorage(esHost, shards, replicas)
 	if err != nil {
 		log.Fatalf("[log_pipeline] failed to initialize ES: %v", err)
 	}

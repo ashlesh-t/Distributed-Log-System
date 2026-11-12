@@ -24,9 +24,20 @@ func nextLogID() string {
 type ElasticsearchStorage struct {
 	client      *elasticsearch.Client
 	indexPrefix string
+	shards      int // primary shards per newly created node index
+	replicas    int
 }
 
-func NewElasticsearchStorage(host string) (*ElasticsearchStorage, error) {
+// NewElasticsearchStorage builds the storage layer. shards/replicas apply to
+// indices created after the template is installed (existing indices keep
+// their shard count; ES cannot change it in place).
+func NewElasticsearchStorage(host string, shards, replicas int) (*ElasticsearchStorage, error) {
+	if shards < 1 {
+		shards = 1
+	}
+	if replicas < 0 {
+		replicas = 0
+	}
 	cfg := elasticsearch.Config{
 		Addresses: []string{host},
 	}
@@ -37,6 +48,8 @@ func NewElasticsearchStorage(host string) (*ElasticsearchStorage, error) {
 	return &ElasticsearchStorage{
 		client:      client,
 		indexPrefix: "distributed_logs",
+		shards:      shards,
+		replicas:    replicas,
 	}, nil
 }
 
@@ -45,8 +58,8 @@ func (s *ElasticsearchStorage) EnsureTemplate(ctx context.Context) error {
 		"index_patterns": []string{s.indexPrefix + "-*"},
 		"template": map[string]interface{}{
 			"settings": map[string]interface{}{
-				"number_of_shards":   1,
-				"number_of_replicas": 1,
+				"number_of_shards":   s.shards,
+				"number_of_replicas": s.replicas,
 			},
 			"mappings": map[string]interface{}{
 				"properties": map[string]interface{}{

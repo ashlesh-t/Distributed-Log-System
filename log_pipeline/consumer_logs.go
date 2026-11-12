@@ -24,12 +24,16 @@ type LogConsumer struct {
 
 func NewLogConsumer(brokers []string, topic string, groupID string, storage *ElasticsearchStorage, bufferSize int) *LogConsumer {
 	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers:        brokers,
-		GroupID:        groupID,
-		Topic:          topic,
-		MinBytes:       10e3, // 10KB
-		MaxBytes:       10e6, // 10MB
-		CommitInterval: 0,    // commit synchronously, and only after a successful flush
+		Brokers:  brokers,
+		GroupID:  groupID,
+		Topic:    topic,
+		MinBytes: 10e3, // 10KB
+		MaxBytes: 10e6, // 10MB
+		// Commits are batched in the background. This stays at-least-once: we only
+		// call CommitMessages after Elasticsearch has accepted the batch, and
+		// reader.Close() flushes pending commits on shutdown. A crash before the
+		// background commit lands just means redelivery, which is idempotent (_id).
+		CommitInterval: 1 * time.Second,
 		StartOffset:    kafka.FirstOffset,
 	})
 
@@ -98,6 +102,10 @@ func (c *LogConsumer) Consume(ctx context.Context) {
 			b.msgs = append(b.msgs, msg)
 
 			var logMsg map[string]interface{}
+			// No `continue` on bad JSON, deliberately: the message is already in
+			// b.msgs so its offset is committed with the batch (otherwise a poison
+			// message would be redelivered forever), and falling through keeps the
+			// batch-size check below running so the batch cannot grow unbounded.
 			if err := json.Unmarshal(msg.Value, &logMsg); err != nil {
 				log.Printf("[kafka_consumer] bad log message json: %v, body: %s", err, string(msg.Value))
 			} else {

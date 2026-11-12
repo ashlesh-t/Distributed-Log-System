@@ -59,6 +59,8 @@ The Go service reads the following environment variables:
 | `KAFKA_BOOTSTRAP_SERVERS` | Comma-separated list of Kafka broker endpoints. | `kafka:9092` |
 | `ELASTICSEARCH_HOST` | Elasticsearch cluster endpoint URL. | `http://elasticsearch:9200` |
 | `LOG_BUFFER_SIZE` | Max number of log records to buffer before triggering a bulk flush. | `10` |
+| `ES_NUMBER_OF_SHARDS` | Primary shards for each newly created per-node index (existing indices keep theirs). | `3` |
+| `ES_NUMBER_OF_REPLICAS` | Replicas for each newly created per-node index. | `1` |
 
 ---
 
