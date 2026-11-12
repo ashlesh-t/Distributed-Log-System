@@ -5,19 +5,39 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"sync/atomic"
 	"time"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
 
+// logIDSeq disambiguates log IDs generated within the same nanosecond.
+var logIDSeq uint64
+
+func nextLogID() string {
+	return fmt.Sprintf("%d-%d", time.Now().UnixNano(), atomic.AddUint64(&logIDSeq, 1))
+}
+
 type ElasticsearchStorage struct {
 	client      *elasticsearch.Client
 	indexPrefix string
+	shards      int // primary shards per newly created node index
+	replicas    int
 }
 
-func NewElasticsearchStorage(host string) (*ElasticsearchStorage, error) {
+// NewElasticsearchStorage builds the storage layer. shards/replicas apply to
+// indices created after the template is installed (existing indices keep
+// their shard count; ES cannot change it in place).
+func NewElasticsearchStorage(host string, shards, replicas int) (*ElasticsearchStorage, error) {
+	if shards < 1 {
+		shards = 1
+	}
+	if replicas < 0 {
+		replicas = 0
+	}
 	cfg := elasticsearch.Config{
 		Addresses: []string{host},
 	}
@@ -28,6 +48,8 @@ func NewElasticsearchStorage(host string) (*ElasticsearchStorage, error) {
 	return &ElasticsearchStorage{
 		client:      client,
 		indexPrefix: "distributed_logs",
+		shards:      shards,
+		replicas:    replicas,
 	}, nil
 }
 
@@ -36,8 +58,8 @@ func (s *ElasticsearchStorage) EnsureTemplate(ctx context.Context) error {
 		"index_patterns": []string{s.indexPrefix + "-*"},
 		"template": map[string]interface{}{
 			"settings": map[string]interface{}{
-				"number_of_shards":   1,
-				"number_of_replicas": 1,
+				"number_of_shards":   s.shards,
+				"number_of_replicas": s.replicas,
 			},
 			"mappings": map[string]interface{}{
 				"properties": map[string]interface{}{
@@ -97,7 +119,7 @@ func (s *ElasticsearchStorage) StoreLogs(ctx context.Context, logs []map[string]
 		// Generate log_id if not present
 		logID, ok := logMsg["log_id"].(string)
 		if !ok || logID == "" {
-			logID = fmt.Sprintf("%d-%f", time.Now().UnixNano(), time.Now().Sub(time.Time{}).Seconds())
+			logID = nextLogID()
 			logMsg["log_id"] = logID
 		}
 
@@ -144,17 +166,47 @@ func (s *ElasticsearchStorage) StoreLogs(ctx context.Context, logs []map[string]
 		return fmt.Errorf("bulk store logs failed: %s", res.String())
 	}
 
-	// Read response to log status
-	var rawResponse map[string]interface{}
-	if err := json.NewDecoder(res.Body).Decode(&rawResponse); err == nil {
-		if errors, ok := rawResponse["errors"].(bool); ok && errors {
-			log.Printf("[elastic] bulk index warned of partial errors")
-		} else {
-			items, _ := rawResponse["items"].([]interface{})
-			log.Printf("[elastic] bulk index stored %d logs successfully", len(items))
-		}
-	}
-
-	return nil
+	return s.checkBulkResponse(res.Body, len(logs))
 }
 
+// checkBulkResponse inspects per-item results. Retryable failures (429/5xx)
+// are returned as an error so the caller retries the whole batch (safe: _id is
+// deterministic). Permanent failures (e.g. 400 mapping errors) are logged with
+// detail and skipped so a single poison document cannot block the pipeline.
+func (s *ElasticsearchStorage) checkBulkResponse(body io.Reader, sent int) error {
+	var resp struct {
+		Errors bool `json:"errors"`
+		Items  []map[string]struct {
+			ID     string          `json:"_id"`
+			Status int             `json:"status"`
+			Error  json.RawMessage `json:"error"`
+		} `json:"items"`
+	}
+	if err := json.NewDecoder(body).Decode(&resp); err != nil {
+		return fmt.Errorf("decoding bulk response: %w", err)
+	}
+	if !resp.Errors {
+		log.Printf("[elastic] bulk index stored %d logs successfully", len(resp.Items))
+		return nil
+	}
+
+	retryable, dropped := 0, 0
+	for _, item := range resp.Items {
+		for _, r := range item {
+			if r.Status < 300 {
+				continue
+			}
+			if r.Status == 429 || r.Status >= 500 {
+				retryable++
+				continue
+			}
+			dropped++
+			log.Printf("[elastic] dropping log %s: permanent bulk error (status %d): %s", r.ID, r.Status, string(r.Error))
+		}
+	}
+	if retryable > 0 {
+		return fmt.Errorf("%d of %d bulk items failed with a retryable error", retryable, sent)
+	}
+	log.Printf("[elastic] bulk index stored %d logs, dropped %d unindexable", sent-dropped, dropped)
+	return nil
+}
