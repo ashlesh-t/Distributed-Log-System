@@ -113,6 +113,7 @@ def test_admin_delete_missing_key_is_404(env, monkeypatch):
         "http://127.0.0.1/x",
         "http://localhost:9200/",
         "http://169.254.169.254/latest",
+        "http://93.184.216.34/",
         "http://10.0.0.5/",
         "ftp://example.com/",
         "http://[::1]/",
@@ -123,6 +124,36 @@ def test_ssrf_urls_rejected(url):
 
     with pytest.raises(UnsafeURLError):
         asyncio.run(assert_public_url(url))
+
+
+def test_private_target_allowed_with_opt_in(monkeypatch):
+    import asyncio
+
+    monkeypatch.setenv("WEBHOOK_ALLOW_PRIVATE_TARGETS", "true")
+    asyncio.run(assert_public_url("http://127.0.0.1:8080/hook"))
+    # metadata endpoint stays blocked even with the opt-in
+    with pytest.raises(UnsafeURLError):
+        asyncio.run(assert_public_url("http://169.254.169.254/"))
+
+
+def test_public_http_allowed_only_with_opt_in(monkeypatch):
+    import asyncio
+
+    monkeypatch.setenv("WEBHOOK_ALLOW_HTTP", "true")
+    asyncio.run(assert_public_url("http://93.184.216.34/"))
+
+
+def test_webhook_store_outage_is_503_not_500(env):
+    es, c = env
+    es.get.side_effect = RuntimeError("down")
+    assert c.delete("/v1/webhooks/w1").status_code == 503
+
+
+def test_delete_race_is_404(env):
+    es, c = env
+    es.get.return_value = {"_source": {"url": "https://e.com", "owner_key_id": "A"}}
+    es.delete.side_effect = not_found()
+    assert c.delete("/v1/webhooks/w1").status_code == 404
 
 
 def test_create_webhook_blocks_internal(env):

@@ -144,6 +144,8 @@ services:
       ELASTICSEARCH_HOST: http://elasticsearch:9200
       API_KEY_SALT: ${API_KEY_SALT:-change-me-in-production}
       ADMIN_SECRET: ${ADMIN_SECRET:-change-me-in-production}
+      WEBHOOK_ALLOW_PRIVATE_TARGETS: ${WEBHOOK_ALLOW_PRIVATE_TARGETS:-false}
+      WEBHOOK_ALLOW_HTTP: ${WEBHOOK_ALLOW_HTTP:-false}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:

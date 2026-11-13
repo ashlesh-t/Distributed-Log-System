@@ -18,6 +18,8 @@ async def _get_owned(webhook_id: str, key_meta: dict) -> dict:
         doc = await get_es().get(index=WEBHOOK_INDEX, id=webhook_id)
     except NotFoundError:
         raise HTTPException(status_code=404, detail="Webhook not found")
+    except Exception:
+        raise HTTPException(status_code=503, detail="Webhook store unavailable")
     src = doc["_source"]
     if src.get("owner_key_id") != key_meta.get("key_id", ""):
         raise HTTPException(status_code=404, detail="Webhook not found")
@@ -58,7 +60,12 @@ async def list_webhooks(key_meta: dict = Depends(verify_api_key)):
 @router.delete("/{webhook_id}", status_code=204)
 async def delete_webhook(webhook_id: str, key_meta: dict = Depends(verify_api_key)):
     await _get_owned(webhook_id, key_meta)
-    await get_es().delete(index=WEBHOOK_INDEX, id=webhook_id)
+    try:
+        await get_es().delete(index=WEBHOOK_INDEX, id=webhook_id)
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Webhook not found")
+    except Exception:
+        raise HTTPException(status_code=503, detail="Webhook store unavailable")
 
 
 @router.post("/{webhook_id}/test")
