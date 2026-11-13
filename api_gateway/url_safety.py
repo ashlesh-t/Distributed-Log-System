@@ -12,14 +12,15 @@ class UnsafeURLError(ValueError):
 
 def _check_ip(addr: str) -> None:
     ip = ipaddress.ip_address(addr)
-    if (
-        ip.is_private
-        or ip.is_loopback
-        or ip.is_link_local
-        or ip.is_multicast
-        or ip.is_reserved
-        or ip.is_unspecified
-    ):
+    flags = (
+        ip.is_private,
+        ip.is_loopback,
+        ip.is_link_local,
+        ip.is_multicast,
+        ip.is_reserved,
+        ip.is_unspecified,
+    )
+    if any(flags):
         raise UnsafeURLError("URL resolves to a non-public address")
 
 

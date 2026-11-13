@@ -87,7 +87,8 @@ def test_bad_key_is_401(monkeypatch):
     import asyncio
     from fastapi import HTTPException
 
-    monkeypatch.setattr(auth, "get_es", lambda: FakeES())
+    es = FakeES()
+    monkeypatch.setattr(auth, "get_es", lambda: es)
     with pytest.raises(HTTPException) as e:
         asyncio.run(auth.verify_api_key("k"))
     assert e.value.status_code == 401
