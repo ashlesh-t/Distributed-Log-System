@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from api_gateway.elastic_client import close_es, get_es
@@ -50,4 +51,8 @@ async def health():
         es_status = "ok" if info["status"] != "red" else "degraded"
     except Exception:
         es_status = "error"
-    return HealthResponse(status="ok", elasticsearch=es_status)
+    healthy = es_status == "ok"
+    body = HealthResponse(
+        status="ok" if healthy else "unhealthy", elasticsearch=es_status
+    )
+    return JSONResponse(body.model_dump(), status_code=200 if healthy else 503)

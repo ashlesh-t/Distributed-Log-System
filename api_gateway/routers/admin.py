@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from api_gateway.auth import verify_admin, create_api_key, delete_api_key
 from api_gateway.schemas import AdminKeyCreate, AdminKeyResponse
@@ -21,4 +21,5 @@ async def issue_api_key(body: AdminKeyCreate):
 
 @router.delete("/keys/{key_id}", status_code=204, dependencies=[Depends(verify_admin)])
 async def revoke_api_key(key_id: str):
-    await delete_api_key(key_id)
+    if not await delete_api_key(key_id):
+        raise HTTPException(status_code=404, detail="Key not found")
