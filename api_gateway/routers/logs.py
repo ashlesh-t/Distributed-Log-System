@@ -1,8 +1,12 @@
-from fastapi import APIRouter, Depends, Query
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api_gateway.auth import verify_api_key
 from api_gateway.elastic_client import get_es
 from api_gateway.schemas import LogEntry, LogsResponse, LogStats
+
+MAX_RESULT_WINDOW = 10000  # Elasticsearch index.max_result_window default
 
 router = APIRouter(prefix="/v1/logs", tags=["logs"])
 
@@ -19,8 +23,8 @@ async def query_logs(
     service_name: str | None = Query(None),
     log_level: str | None = Query(None),
     node_id: str | None = Query(None),
-    from_ts: str | None = Query(None),
-    to_ts: str | None = Query(None),
+    from_ts: datetime | None = Query(None),
+    to_ts: datetime | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
     key_meta: dict = Depends(verify_api_key),
@@ -35,11 +39,16 @@ async def query_logs(
     if from_ts or to_ts:
         rng: dict = {}
         if from_ts:
-            rng["gte"] = from_ts
+            rng["gte"] = from_ts.isoformat()
         if to_ts:
-            rng["lte"] = to_ts
+            rng["lte"] = to_ts.isoformat()
         must.append({"range": {"timestamp": rng}})
 
+    if page * page_size > MAX_RESULT_WINDOW:
+        raise HTTPException(
+            status_code=422,
+            detail=f"page * page_size must not exceed {MAX_RESULT_WINDOW}",
+        )
     body = {
         "query": {"bool": {"filter": must}},
         "sort": [{"timestamp": {"order": "desc"}}],
@@ -56,8 +65,8 @@ async def query_logs(
 
 @router.get("/stats", response_model=LogStats)
 async def log_stats(
-    from_ts: str | None = Query(None),
-    to_ts: str | None = Query(None),
+    from_ts: datetime | None = Query(None),
+    to_ts: datetime | None = Query(None),
     service_name: str | None = Query(None),
     key_meta: dict = Depends(verify_api_key),
 ):
@@ -67,9 +76,9 @@ async def log_stats(
     if from_ts or to_ts:
         rng: dict = {}
         if from_ts:
-            rng["gte"] = from_ts
+            rng["gte"] = from_ts.isoformat()
         if to_ts:
-            rng["lte"] = to_ts
+            rng["lte"] = to_ts.isoformat()
         must.append({"range": {"timestamp": rng}})
 
     body = {
@@ -108,7 +117,5 @@ async def get_log(log_id: str, key_meta: dict = Depends(verify_api_key)):
     )
     hits = resp["hits"]["hits"]
     if not hits:
-        from fastapi import HTTPException
-
         raise HTTPException(status_code=404, detail="Log not found")
     return LogEntry(**hits[0]["_source"])

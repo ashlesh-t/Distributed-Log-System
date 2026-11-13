@@ -1,7 +1,10 @@
 import hashlib
+import hmac
+import logging
 import os
 import secrets
 
+from elasticsearch import NotFoundError
 from fastapi import Header, HTTPException, status
 
 from api_gateway.elastic_client import get_es
@@ -9,6 +12,11 @@ from api_gateway.elastic_client import get_es
 SALT = os.environ.get("API_KEY_SALT", "change-me-in-production")
 ADMIN_SECRET = os.environ.get("ADMIN_SECRET", "change-me-in-production")
 KEY_INDEX = "api_keys"
+
+if "change-me-in-production" in (SALT, ADMIN_SECRET):
+    logging.getLogger(__name__).warning(
+        "API_KEY_SALT/ADMIN_SECRET use the insecure default; set real values."
+    )
 
 
 def _hash_key(plaintext: str) -> str:
@@ -34,12 +42,13 @@ async def verify_api_key(x_api_key: str = Header(...)) -> dict:
         raise
     except Exception:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key"
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication backend unavailable",
         )
 
 
 def verify_admin(x_admin_secret: str = Header(...)) -> None:
-    if x_admin_secret != ADMIN_SECRET:
+    if not hmac.compare_digest(x_admin_secret.encode(), ADMIN_SECRET.encode()):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Invalid admin secret"
         )
@@ -55,6 +64,7 @@ async def create_api_key(owner_email: str) -> tuple[str, str]:
         index=KEY_INDEX,
         id=key_id,
         body={"key_id": key_id, "key_hash": key_hash, "owner_email": owner_email},
+        refresh="wait_for",
     )
     return plaintext, key_id
 
@@ -64,5 +74,5 @@ async def delete_api_key(key_id: str) -> bool:
     try:
         await es.delete(index=KEY_INDEX, id=key_id)
         return True
-    except Exception:
+    except NotFoundError:
         return False

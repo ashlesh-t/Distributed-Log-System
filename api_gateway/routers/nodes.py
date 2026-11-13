@@ -1,3 +1,4 @@
+from elasticsearch import NotFoundError
 from fastapi import APIRouter, Depends, HTTPException
 
 from api_gateway.auth import verify_api_key
@@ -33,14 +34,20 @@ async def get_node(node_id: str, key_meta: dict = Depends(verify_api_key)):
 @router.post("/{node_id}/restart", response_model=RestartResponse)
 async def restart_node(node_id: str, key_meta: dict = Depends(verify_api_key)):
     backend = os.environ.get("RESTART_BACKEND", "docker")
-    service_name = node_id  # fallback; real lookup via ES node_status
     es = get_es()
+    # Only known nodes can be restarted: node_id must never be used as a raw
+    # container name, or any key holder could restart arbitrary containers.
     try:
         doc = await es.get(index="node_status", id=node_id)
-        service_name = doc["_source"].get("service_name", node_id)
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Node not found")
     except Exception:
-        pass
-    await _restarter.restart(node_id, service_name)
+        raise HTTPException(status_code=503, detail="Node store unavailable")
+    service_name = doc["_source"].get("service_name")
+    if not service_name:
+        raise HTTPException(status_code=404, detail="Node has no service name")
+    if not await _restarter.restart(node_id, service_name):
+        raise HTTPException(status_code=502, detail="Restart failed")
     return RestartResponse(triggered=True, backend=backend)
 
 
