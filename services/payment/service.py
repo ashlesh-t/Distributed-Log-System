@@ -10,6 +10,7 @@ from common.config import load_settings
 from common.node_id import get_node_id
 from common.heartbeat import HeartbeatPublisher
 from common.logger import get_json_logger
+from common.runtime import run_until_shutdown
 
 SERVICE_NAME = "Payment_Service"
 logger = get_json_logger(SERVICE_NAME)
@@ -85,10 +86,9 @@ async def main() -> None:
     logger.info("Service registered", extra=registration_data)
 
     try:
-        await asyncio.gather(hb.run_loop(), generate_logs(node_id))
-    except asyncio.CancelledError:
-        pass
+        await run_until_shutdown(hb.run_loop(), generate_logs(node_id))
     finally:
+        # Announce a graceful stop so the watcher doesn't treat it as a crash.
         await hb.close()
 
 
