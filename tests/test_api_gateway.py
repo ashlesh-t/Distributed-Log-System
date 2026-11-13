@@ -9,7 +9,7 @@ from elasticsearch import NotFoundError
 from fastapi.testclient import TestClient
 
 from api_gateway import auth, main
-from api_gateway.routers import admin, logs, nodes, webhooks
+from api_gateway.routers import logs, nodes, webhooks
 from api_gateway.url_safety import UnsafeURLError, assert_public_url
 
 
