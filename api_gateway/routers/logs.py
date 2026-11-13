@@ -113,7 +113,14 @@ async def get_log(log_id: str, key_meta: dict = Depends(verify_api_key)):
     es = get_es()
     resp = await es.search(
         index="distributed_logs-*",
-        body={"query": {"term": {"log_id": log_id}}, "size": 1},
+        body={
+            "query": {
+                "bool": {
+                    "filter": [{"term": {"log_id": log_id}}, *_tenant_filter(key_meta)]
+                }
+            },
+            "size": 1,
+        },
     )
     hits = resp["hits"]["hits"]
     if not hits:

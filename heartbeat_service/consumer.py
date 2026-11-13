@@ -3,14 +3,25 @@ import json
 import os
 from aiokafka import AIOKafkaConsumer
 
+from heartbeat_service.error_spike import ErrorSpikeDetector
 from heartbeat_service.node_watcher import NodeWatcher
+from heartbeat_service.restart_worker import RestartWorker
 
 KAFKA_SERVERS = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
+
+
+async def _purge_heartbeats_hourly(watcher: NodeWatcher) -> None:
+    while True:
+        await watcher.purge_heartbeats()
+        await asyncio.sleep(3600)
 
 
 async def main() -> None:
     watcher = NodeWatcher()
     asyncio.create_task(watcher.watch_loop())
+    asyncio.create_task(RestartWorker().run())
+    asyncio.create_task(ErrorSpikeDetector().run())
+    asyncio.create_task(_purge_heartbeats_hourly(watcher))
 
     for attempt in range(10):
         try:

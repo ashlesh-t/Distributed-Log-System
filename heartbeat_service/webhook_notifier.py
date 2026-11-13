@@ -6,17 +6,23 @@ from datetime import datetime, timezone
 
 import httpx
 
+from common import secret_box
+from common.url_safety import UnsafeURLError, assert_public_url
+
 
 class WebhookNotifier:
     def __init__(self):
         self._global_url = os.environ.get("WEBHOOK_URL", "")
 
-    async def notify(self, node_id: str, service_name: str, event: str) -> None:
+    async def notify(
+        self, node_id: str, service_name: str, event: str, extra: dict | None = None
+    ) -> None:
         payload = {
             "event": event,
             "node_id": node_id,
             "service_name": service_name,
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            **(extra or {}),
         }
         # Fire global webhook if configured
         if self._global_url:
@@ -45,7 +51,19 @@ class WebhookNotifier:
             await es.close()
             for hit in resp["hits"]["hits"]:
                 wh = hit["_source"]
-                await self._post(wh["url"], payload, secret=wh.get("secret", ""))
+                # Tenant scoping: a webhook only sees events for nodes its owner
+                # key may access (empty list = unrestricted key).
+                allowed = wh.get("owner_node_ids") or []
+                if allowed and node_id not in allowed:
+                    continue
+                try:
+                    await assert_public_url(wh["url"])
+                except UnsafeURLError as exc:
+                    print(f"[webhook] skipping unsafe target {wh['url']}: {exc}")
+                    continue
+                await self._post(
+                    wh["url"], payload, secret=secret_box.decrypt(wh.get("secret", ""))
+                )
         except Exception as exc:
             print(f"[webhook] ES webhook lookup error: {exc}")
 

@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from api_gateway import auth, main
 from api_gateway.routers import logs, nodes, webhooks
-from api_gateway.url_safety import UnsafeURLError, assert_public_url
+from common.url_safety import UnsafeURLError, assert_public_url
 
 
 class FakeES:
@@ -184,28 +184,109 @@ def test_owner_can_delete_webhook(env):
     es.delete.assert_awaited_once()
 
 
-# --- #11 / #24 ---------------------------------------------------------
-def test_restart_unknown_node_is_404_and_not_attempted(env, monkeypatch):
+# --- restart (queued, gated) -------------------------------------------
+def as_key(app_client, **meta):
+    main.app.dependency_overrides[auth.verify_api_key] = lambda: {"key_id": "A", **meta}
+
+
+def test_restart_requires_can_restart(env):
     es, c = env
+    assert c.post("/v1/nodes/n1/restart").status_code == 403
+    es.index.assert_not_called()
+
+
+def test_restart_unknown_node_is_404_and_not_queued(env):
+    es, c = env
+    as_key(c, can_restart=True)
     es.get.side_effect = not_found()
-    restart = AsyncMock(return_value=True)
-    monkeypatch.setattr(nodes._restarter, "restart", restart)
     assert c.post("/v1/nodes/does-not-exist/restart").status_code == 404
-    restart.assert_not_called()
+    es.index.assert_not_called()
 
 
-def test_restart_failure_is_502(env, monkeypatch):
+def test_restart_other_tenants_node_is_404(env):
     es, c = env
-    es.get.return_value = {"_source": {"service_name": "Order_Service"}}
-    monkeypatch.setattr(nodes._restarter, "restart", AsyncMock(return_value=False))
-    assert c.post("/v1/nodes/n1/restart").status_code == 502
+    as_key(c, can_restart=True, node_ids=["mine"])
+    assert c.post("/v1/nodes/theirs/restart").status_code == 404
+    es.index.assert_not_called()
 
 
-def test_restart_success(env, monkeypatch):
+def test_restart_is_queued_not_executed_by_gateway(env):
     es, c = env
+    as_key(c, can_restart=True)
     es.get.return_value = {"_source": {"service_name": "Order_Service"}}
-    restart = AsyncMock(return_value=True)
-    monkeypatch.setattr(nodes._restarter, "restart", restart)
     r = c.post("/v1/nodes/n1/restart")
-    assert r.status_code == 200 and r.json()["triggered"] is True
-    restart.assert_awaited_once_with("n1", "Order_Service")
+    assert r.status_code == 202 and r.json()["triggered"] is True
+    doc = es.index.await_args.kwargs["body"]
+    assert doc["node_id"] == "n1" and doc["status"] == "pending"
+    assert doc["service_name"] == "Order_Service"
+
+
+def test_gateway_does_not_import_docker_restart_handler():
+    assert not hasattr(nodes, "RestartHandler")
+
+
+# --- tenant scoping --------------------------------------------------------
+def test_scoped_key_cannot_read_other_node(env):
+    es, c = env
+    as_key(c, node_ids=["mine"])
+    assert c.get("/v1/nodes/theirs").status_code == 404
+    assert c.get("/v1/nodes/theirs/heartbeats").status_code == 404
+    es.get.assert_not_called()
+
+
+def test_scoped_key_node_list_filtered(env):
+    es, c = env
+    as_key(c, node_ids=["mine"])
+    c.get("/v1/nodes")
+    q = es.search.await_args.kwargs["body"]["query"]
+    assert q == {"ids": {"values": ["mine"]}}
+
+
+def test_get_log_applies_tenant_filter(env):
+    es, c = env
+    as_key(c, node_ids=["mine"])
+    c.get("/v1/logs/abc")
+    flt = es.search.await_args.kwargs["body"]["query"]["bool"]["filter"]
+    assert {"terms": {"node_id": ["mine"]}} in flt
+
+
+def test_heartbeats_read_from_heartbeat_index(env):
+    es, c = env
+    es.search.return_value = {
+        "hits": {"hits": [{"_source": {"node_id": "n1", "timestamp": "t"}}]}
+    }
+    r = c.get("/v1/nodes/n1/heartbeats")
+    assert r.json()["heartbeats"][0]["node_id"] == "n1"
+    assert es.search.await_args.kwargs["index"] == "node_heartbeats"
+
+
+def test_admin_key_stores_scope(env, monkeypatch):
+    es, c = env
+    monkeypatch.setattr(auth, "get_es", lambda: es)
+    monkeypatch.setattr(auth, "ADMIN_SECRET", "s")
+    r = c.post(
+        "/admin/keys",
+        headers={"X-Admin-Secret": "s"},
+        json={"owner_email": "a@b.c", "node_ids": ["n1"], "can_restart": True},
+    )
+    assert r.status_code == 201
+    body = es.index.await_args.kwargs["body"]
+    assert body["node_ids"] == ["n1"] and body["can_restart"] is True
+
+
+def test_webhook_secret_encrypted_and_scope_recorded(env, monkeypatch):
+    es, c = env
+    as_key(c, node_ids=["n1"])
+    monkeypatch.setenv("WEBHOOK_ALLOW_PRIVATE_TARGETS", "true")
+    r = c.post(
+        "/v1/webhooks",
+        json={
+            "url": "https://93.184.216.34/h",
+            "events": ["node_down"],
+            "secret": "s3",
+        },
+    )
+    assert r.status_code == 201
+    doc = es.index.await_args.kwargs["body"]
+    assert doc["secret"].startswith("enc:") and "s3" not in doc["secret"]
+    assert doc["owner_node_ids"] == ["n1"]

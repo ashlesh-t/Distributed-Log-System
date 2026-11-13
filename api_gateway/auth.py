@@ -54,7 +54,9 @@ def verify_admin(x_admin_secret: str = Header(...)) -> None:
         )
 
 
-async def create_api_key(owner_email: str) -> tuple[str, str]:
+async def create_api_key(
+    owner_email: str, node_ids: list[str] | None = None, can_restart: bool = False
+) -> tuple[str, str]:
     """Generate a new API key. Returns (plaintext_key, key_id)."""
     plaintext = f"dls_{secrets.token_urlsafe(24)}"
     key_id = secrets.token_hex(16)
@@ -63,7 +65,13 @@ async def create_api_key(owner_email: str) -> tuple[str, str]:
     await es.index(
         index=KEY_INDEX,
         id=key_id,
-        body={"key_id": key_id, "key_hash": key_hash, "owner_email": owner_email},
+        body={
+            "key_id": key_id,
+            "key_hash": key_hash,
+            "owner_email": owner_email,
+            "node_ids": node_ids or [],
+            "can_restart": can_restart,
+        },
         refresh="wait_for",
     )
     return plaintext, key_id
@@ -76,3 +84,9 @@ async def delete_api_key(key_id: str) -> bool:
         return True
     except NotFoundError:
         return False
+
+
+def node_allowed(key_meta: dict, node_id: str) -> bool:
+    """A key with no node_ids sees every node; otherwise only the listed ones."""
+    node_ids = key_meta.get("node_ids") or []
+    return not node_ids or node_id in node_ids

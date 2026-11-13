@@ -31,6 +31,11 @@ spec:
                 secretKeyRef:
                   name: dls-secrets
                   key: ADMIN_SECRET
+            - name: WEBHOOK_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: dls-secrets
+                  key: WEBHOOK_ENCRYPTION_KEY
           livenessProbe:
             httpGet:
               path: /health

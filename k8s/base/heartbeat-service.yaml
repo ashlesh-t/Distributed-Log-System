@@ -63,6 +63,11 @@ spec:
                 secretKeyRef:
                   name: dls-secrets
                   key: WEBHOOK_URL
+            - name: WEBHOOK_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: dls-secrets
+                  key: WEBHOOK_ENCRYPTION_KEY
           resources:
             requests:
               cpu: "50m"

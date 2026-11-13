@@ -10,16 +10,23 @@ from heartbeat_service import node_watcher
 class FakeStatus:
     def __init__(self):
         self.calls = []
+        self.heartbeats = 0
 
     async def upsert(self, node_id, service_name, status):
         self.calls.append((node_id, status))
+
+    async def record_heartbeat(self, node_id, service_name):
+        self.heartbeats += 1
+
+    async def purge_old_heartbeats(self):
+        pass
 
 
 class FakeWebhooks:
     def __init__(self):
         self.events = []
 
-    async def notify(self, node_id, service_name, event):
+    async def notify(self, node_id, service_name, event, extra=None):
         self.events.append((node_id, event))
 
 

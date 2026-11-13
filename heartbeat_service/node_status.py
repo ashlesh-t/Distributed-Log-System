@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 from elasticsearch import AsyncElasticsearch
 
 INDEX = "node_status"
+HEARTBEAT_INDEX = "node_heartbeats"
+HEARTBEAT_RETENTION = os.environ.get("HEARTBEAT_RETENTION", "now-24h")
 
 
 class NodeStatusManager:
@@ -25,6 +27,30 @@ class NodeStatusManager:
             )
         except Exception as exc:
             print(f"[node_status] upsert error: {exc}")
+
+    async def record_heartbeat(self, node_id: str, service_name: str) -> None:
+        """Store a (throttled by the caller) heartbeat sample for the API."""
+        try:
+            await self.es.index(
+                index=HEARTBEAT_INDEX,
+                body={
+                    "node_id": node_id,
+                    "service_name": service_name,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+            )
+        except Exception as exc:
+            print(f"[node_status] heartbeat record error: {exc}")
+
+    async def purge_old_heartbeats(self) -> None:
+        try:
+            await self.es.delete_by_query(
+                index=HEARTBEAT_INDEX,
+                body={"query": {"range": {"timestamp": {"lt": HEARTBEAT_RETENTION}}}},
+                ignore_unavailable=True,
+            )
+        except Exception as exc:
+            print(f"[node_status] heartbeat purge error: {exc}")
 
     async def get_all(self) -> list[dict]:
         try:

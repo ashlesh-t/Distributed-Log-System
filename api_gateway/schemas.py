@@ -86,12 +86,18 @@ class WebhooksResponse(BaseModel):
 
 class AdminKeyCreate(BaseModel):
     owner_email: str
+    # Restrict the key to these nodes (empty = all nodes).
+    node_ids: list[str] = []
+    # Whether this key may request node restarts.
+    can_restart: bool = False
 
 
 class AdminKeyResponse(BaseModel):
     api_key: str
     key_id: str
     owner_email: str
+    node_ids: list[str] = []
+    can_restart: bool = False
     note: str = "Store this key safely — it will not be shown again."
 
 
