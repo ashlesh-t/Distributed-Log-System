@@ -5,11 +5,12 @@ from elasticsearch import NotFoundError
 
 from api_gateway.auth import verify_api_key
 from api_gateway.elastic_client import get_es
-from api_gateway.url_safety import UnsafeURLError, assert_public_url
 from api_gateway.schemas import WebhookCreate, WebhookInfo, WebhooksResponse
+from common import secret_box
+from common.constants import WEBHOOK_INDEX
+from common.url_safety import UnsafeURLError, assert_public_url
 
 router = APIRouter(prefix="/v1/webhooks", tags=["webhooks"])
-WEBHOOK_INDEX = "webhooks"
 
 
 async def _get_owned(webhook_id: str, key_meta: dict) -> dict:
@@ -38,7 +39,9 @@ async def create_webhook(body: WebhookCreate, key_meta: dict = Depends(verify_ap
         "webhook_id": webhook_id,
         "url": body.url,
         "events": body.events,
-        "secret": body.secret,
+        "secret": secret_box.encrypt(body.secret),
+        # Notifier only fires this webhook for nodes the owner may see.
+        "owner_node_ids": key_meta.get("node_ids") or [],
         "owner_key_id": key_meta.get("key_id", ""),
     }
     await es.index(index=WEBHOOK_INDEX, id=webhook_id, body=doc)

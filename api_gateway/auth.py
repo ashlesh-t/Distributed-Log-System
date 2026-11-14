@@ -8,12 +8,13 @@ from elasticsearch import NotFoundError
 from fastapi import Header, HTTPException, status
 
 from api_gateway.elastic_client import get_es
+from common.constants import API_KEY_INDEX, INSECURE_DEFAULT_SECRET
 
-SALT = os.environ.get("API_KEY_SALT", "change-me-in-production")
-ADMIN_SECRET = os.environ.get("ADMIN_SECRET", "change-me-in-production")
-KEY_INDEX = "api_keys"
+SALT = os.environ.get("API_KEY_SALT", INSECURE_DEFAULT_SECRET)
+ADMIN_SECRET = os.environ.get("ADMIN_SECRET", INSECURE_DEFAULT_SECRET)
+KEY_INDEX = API_KEY_INDEX
 
-if "change-me-in-production" in (SALT, ADMIN_SECRET):
+if INSECURE_DEFAULT_SECRET in (SALT, ADMIN_SECRET):
     logging.getLogger(__name__).warning(
         "API_KEY_SALT/ADMIN_SECRET use the insecure default; set real values."
     )
@@ -24,7 +25,12 @@ def _hash_key(plaintext: str) -> str:
 
 
 async def verify_api_key(x_api_key: str = Header(...)) -> dict:
-    """FastAPI dependency: validates X-API-Key header, returns key metadata."""
+    """FastAPI dependency: validates X-API-Key header, returns key metadata.
+
+    The returned dict is the ``api_keys`` document ``_source``:
+    ``key_id``, ``key_hash``, ``owner_email``, ``node_ids`` (list; empty/absent =
+    all nodes) and ``can_restart`` (bool; absent on legacy keys = False).
+    """
     key_hash = _hash_key(x_api_key)
     es = get_es()
     try:
@@ -54,7 +60,9 @@ def verify_admin(x_admin_secret: str = Header(...)) -> None:
         )
 
 
-async def create_api_key(owner_email: str) -> tuple[str, str]:
+async def create_api_key(
+    owner_email: str, node_ids: list[str] | None = None, can_restart: bool = False
+) -> tuple[str, str]:
     """Generate a new API key. Returns (plaintext_key, key_id)."""
     plaintext = f"dls_{secrets.token_urlsafe(24)}"
     key_id = secrets.token_hex(16)
@@ -63,7 +71,13 @@ async def create_api_key(owner_email: str) -> tuple[str, str]:
     await es.index(
         index=KEY_INDEX,
         id=key_id,
-        body={"key_id": key_id, "key_hash": key_hash, "owner_email": owner_email},
+        body={
+            "key_id": key_id,
+            "key_hash": key_hash,
+            "owner_email": owner_email,
+            "node_ids": node_ids or [],
+            "can_restart": can_restart,
+        },
         refresh="wait_for",
     )
     return plaintext, key_id
@@ -76,3 +90,9 @@ async def delete_api_key(key_id: str) -> bool:
         return True
     except NotFoundError:
         return False
+
+
+def node_allowed(key_meta: dict, node_id: str) -> bool:
+    """A key with no node_ids sees every node; otherwise only the listed ones."""
+    node_ids = key_meta.get("node_ids") or []
+    return not node_ids or node_id in node_ids

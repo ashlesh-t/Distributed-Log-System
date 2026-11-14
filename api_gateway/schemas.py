@@ -51,8 +51,16 @@ class NodesResponse(BaseModel):
 
 
 class RestartResponse(BaseModel):
-    triggered: bool
+    triggered: bool  # True = request accepted and queued (not yet executed)
     backend: str
+    request_id: str
+    status: str
+
+
+class RestartStatusResponse(BaseModel):
+    request_id: str
+    node_id: str
+    status: str  # pending | running | done | failed
 
 
 # ── Webhooks ──────────────────────────────────────────────────────────────────
@@ -86,12 +94,18 @@ class WebhooksResponse(BaseModel):
 
 class AdminKeyCreate(BaseModel):
     owner_email: str
+    # Restrict the key to these nodes (empty = all nodes).
+    node_ids: list[str] = []
+    # Whether this key may request node restarts.
+    can_restart: bool = False
 
 
 class AdminKeyResponse(BaseModel):
     api_key: str
     key_id: str
     owner_email: str
+    node_ids: list[str] = []
+    can_restart: bool = False
     note: str = "Store this key safely — it will not be shown again."
 
 

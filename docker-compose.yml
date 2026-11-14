@@ -127,6 +127,9 @@ services:
       RESTART_BACKEND: docker
       HEARTBEAT_TIMEOUT_SECONDS: "15"
       WEBHOOK_URL: ${WEBHOOK_URL:-}
+      WEBHOOK_ALLOW_PRIVATE_TARGETS: ${WEBHOOK_ALLOW_PRIVATE_TARGETS:-false}
+      WEBHOOK_ALLOW_HTTP: ${WEBHOOK_ALLOW_HTTP:-false}
+      WEBHOOK_ENCRYPTION_KEY: ${WEBHOOK_ENCRYPTION_KEY:-change-me-in-production}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 
@@ -146,8 +149,7 @@ services:
       ADMIN_SECRET: ${ADMIN_SECRET:-change-me-in-production}
       WEBHOOK_ALLOW_PRIVATE_TARGETS: ${WEBHOOK_ALLOW_PRIVATE_TARGETS:-false}
       WEBHOOK_ALLOW_HTTP: ${WEBHOOK_ALLOW_HTTP:-false}
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      WEBHOOK_ENCRYPTION_KEY: ${WEBHOOK_ENCRYPTION_KEY:-change-me-in-production}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health',timeout=3).status==200 else 1)"]
       interval: 10s

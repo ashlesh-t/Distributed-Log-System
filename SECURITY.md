@@ -57,7 +57,7 @@ You will receive a response within 72 hours. We follow responsible disclosure â€
 - [ ] Change `API_KEY_SALT`, `ADMIN_SECRET`, and broker passwords from defaults.
 - [ ] Set `xpack.security.enabled: true` in Elasticsearch configurations.
 - [ ] Enable TLS between microservices, Fluent Bit, Kafka, and Elasticsearch.
-- [ ] Remove `/var/run/docker.sock` mounts from container configs. Use Kubernetes Liveness Probes for restarts.
+- [ ] Remove the `/var/run/docker.sock` mount from `heartbeat_service` (the API gateway no longer needs it; restarts are queued and executed by heartbeat_service). Use Kubernetes Liveness Probes for restarts.
 - [ ] Implement index lifecycle management (ILM) in Elasticsearch to automatically prune stale log indices.
 - [ ] Block external public access to Elasticsearch port `9200` and Kibana port `5601` behind private subnets/VPNs.
 - [ ] Use Kubernetes Secret resources or cloud-specific key vaults (AWS Secrets Manager, GCP Secret Manager) to manage salts and secrets.

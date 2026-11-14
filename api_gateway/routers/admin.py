@@ -13,9 +13,15 @@ router = APIRouter(prefix="/admin", tags=["admin"])
     dependencies=[Depends(verify_admin)],
 )
 async def issue_api_key(body: AdminKeyCreate):
-    plaintext, key_id = await create_api_key(body.owner_email)
+    plaintext, key_id = await create_api_key(
+        body.owner_email, body.node_ids, body.can_restart
+    )
     return AdminKeyResponse(
-        api_key=plaintext, key_id=key_id, owner_email=body.owner_email
+        api_key=plaintext,
+        key_id=key_id,
+        owner_email=body.owner_email,
+        node_ids=body.node_ids,
+        can_restart=body.can_restart,
     )
 
 
