@@ -2,14 +2,19 @@ import os
 from datetime import datetime, timezone
 from elasticsearch import AsyncElasticsearch
 
-INDEX = "node_status"
-HEARTBEAT_INDEX = "node_heartbeats"
+from common.constants import (
+    DEFAULT_ES_HOST,
+    ENV_ES_HOST,
+    NODE_HEARTBEAT_INDEX as HEARTBEAT_INDEX,
+    NODE_STATUS_INDEX as INDEX,
+)
+
 HEARTBEAT_RETENTION = os.environ.get("HEARTBEAT_RETENTION", "now-24h")
 
 
 class NodeStatusManager:
     def __init__(self):
-        host = os.environ.get("ELASTICSEARCH_HOST", "http://elasticsearch:9200")
+        host = os.environ.get(ENV_ES_HOST, DEFAULT_ES_HOST)
         self.es = AsyncElasticsearch(host)
 
     async def upsert(self, node_id: str, service_name: str, status: str) -> None:

@@ -5,8 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from api_gateway.auth import verify_api_key
 from api_gateway.elastic_client import get_es
 from api_gateway.schemas import LogEntry, LogsResponse, LogStats
-
-MAX_RESULT_WINDOW = 10000  # Elasticsearch index.max_result_window default
+from common.constants import LOG_INDEX_PATTERN, MAX_RESULT_WINDOW
 
 router = APIRouter(prefix="/v1/logs", tags=["logs"])
 
@@ -56,7 +55,7 @@ async def query_logs(
         "size": page_size,
     }
     es = get_es()
-    resp = await es.search(index="distributed_logs-*", body=body)
+    resp = await es.search(index=LOG_INDEX_PATTERN, body=body)
     hits = resp["hits"]["hits"]
     total = resp["hits"]["total"]["value"]
     logs = [LogEntry(**h["_source"]) for h in hits if "node_id" in h["_source"]]
@@ -90,7 +89,7 @@ async def log_stats(
         },
     }
     es = get_es()
-    resp = await es.search(index="distributed_logs-*", body=body)
+    resp = await es.search(index=LOG_INDEX_PATTERN, body=body)
     total = resp["hits"]["total"]["value"]
     by_level = {
         b["key"]: b["doc_count"] for b in resp["aggregations"]["by_level"]["buckets"]
@@ -112,7 +111,7 @@ async def log_stats(
 async def get_log(log_id: str, key_meta: dict = Depends(verify_api_key)):
     es = get_es()
     resp = await es.search(
-        index="distributed_logs-*",
+        index=LOG_INDEX_PATTERN,
         body={
             "query": {
                 "bool": {

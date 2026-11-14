@@ -51,8 +51,16 @@ class NodesResponse(BaseModel):
 
 
 class RestartResponse(BaseModel):
-    triggered: bool
+    triggered: bool  # True = request accepted and queued (not yet executed)
     backend: str
+    request_id: str
+    status: str
+
+
+class RestartStatusResponse(BaseModel):
+    request_id: str
+    node_id: str
+    status: str  # pending | running | done | failed
 
 
 # ── Webhooks ──────────────────────────────────────────────────────────────────

@@ -1,9 +1,12 @@
 import asyncio
 import os
 import sys
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from elasticsearch import ConflictError, NotFoundError
 
 from common import secret_box
 from heartbeat_service import error_spike, node_watcher, webhook_notifier
@@ -60,17 +63,19 @@ def test_notifier_skips_unsafe_stored_target(monkeypatch):
     assert webhook_notifier  # module under test imported
 
 
+def _hit(i, node):
+    return {
+        "_id": i,
+        "_seq_no": 1,
+        "_primary_term": 1,
+        "_source": {"node_id": node, "service_name": "S"},
+    }
+
+
 def test_restart_worker_runs_pending_and_marks_status():
     es = MagicMock()
     es.search = AsyncMock(
-        return_value={
-            "hits": {
-                "hits": [
-                    {"_id": "r1", "_source": {"node_id": "n1", "service_name": "S"}},
-                    {"_id": "r2", "_source": {"node_id": "n2", "service_name": "T"}},
-                ]
-            }
-        }
+        return_value={"hits": {"hits": [_hit("r1", "n1"), _hit("r2", "n2")]}}
     )
     es.update = AsyncMock()
     restarter = MagicMock()
@@ -79,34 +84,112 @@ def test_restart_worker_runs_pending_and_marks_status():
     assert n == 2
     statuses = [c.kwargs["body"]["doc"]["status"] for c in es.update.await_args_list]
     assert statuses == ["running", "done", "running", "failed"]
+    # claims are optimistic-concurrency guarded
+    assert es.update.await_args_list[0].kwargs["if_seq_no"] == 1
+
+
+def test_two_workers_cannot_both_execute_one_request():
+    """Simulates two replicas racing for the same pending request."""
+    state = {"claimed": False}
+
+    async def update(**kw):
+        if "if_seq_no" in kw:
+            if state["claimed"]:
+                raise ConflictError(409, "conflict", {})
+            state["claimed"] = True
+
+    def make():
+        es = MagicMock()
+        es.search = AsyncMock(return_value={"hits": {"hits": [_hit("r1", "n1")]}})
+        es.update = AsyncMock(side_effect=update)
+        r = MagicMock()
+        r.restart = AsyncMock(return_value=True)
+        return RestartWorker(es=es, restarter=r), r
+
+    w1, r1 = make()
+    w2, r2 = make()
+
+    async def both():
+        return await asyncio.gather(w1.process_once(), w2.process_once())
+
+    results = asyncio.run(both())
+    assert sorted(results) == [0, 1]
+    assert r1.restart.await_count + r2.restart.await_count == 1
+
+
+class SpikeES:
+    """In-memory stand-in for the ES calls the detector makes."""
+
+    def __init__(self, buckets):
+        self.buckets = buckets
+        self.state = {}  # node_id -> (doc, seq)
+        self.searches = []
+
+    async def search(self, **kw):
+        self.searches.append(kw["body"])
+        return {"aggregations": {"by_node": {"buckets": self.buckets}}}
+
+    async def get(self, index, id):
+        if id not in self.state:
+            raise NotFoundError(404, "nf", {})
+        doc, seq = self.state[id]
+        return {"_source": doc, "_seq_no": seq, "_primary_term": 1}
+
+    async def index(self, index, id, body, op_type=None, if_seq_no=None, **_):
+        cur = self.state.get(id)
+        if op_type == "create" and cur is not None:
+            raise ConflictError(409, "c", {})
+        if if_seq_no is not None and (cur is None or cur[1] != if_seq_no):
+            raise ConflictError(409, "c", {})
+        self.state[id] = (body, (cur[1] + 1) if cur else 0)
+
+
+BUCKET = {"key": "n1", "doc_count": 50, "svc": {"buckets": [{"key": "Order"}]}}
 
 
 def test_error_spike_alerts_once_per_cooldown():
-    es = MagicMock()
-    es.search = AsyncMock(
-        return_value={
-            "aggregations": {
-                "by_node": {
-                    "buckets": [
-                        {
-                            "key": "n1",
-                            "doc_count": 50,
-                            "svc": {"buckets": [{"key": "Order"}]},
-                        }
-                    ]
-                }
-            }
-        }
-    )
+    es = SpikeES([BUCKET])
     notifier = MagicMock()
     notifier.notify = AsyncMock()
-    t = [1000.0]
+    t = [1_000_000.0]
     d = ErrorSpikeDetector(es=es, notifier=notifier, clock=lambda: t[0])
     assert asyncio.run(d.check_once()) == ["n1"]
-    assert asyncio.run(d.check_once()) == []  # cooldown
+    assert asyncio.run(d.check_once()) == []  # cooldown (shared state in ES)
     t[0] += error_spike.COOLDOWN_SECONDS + 1
     assert asyncio.run(d.check_once()) == ["n1"]
     assert notifier.notify.await_args.args[2] == "error_spike"
+
+
+def test_replicas_do_not_double_alert():
+    es = SpikeES([BUCKET])  # shared ES == shared state
+    notifiers = []
+    dets = []
+    for _ in range(2):
+        n = MagicMock()
+        n.notify = AsyncMock()
+        notifiers.append(n)
+        dets.append(ErrorSpikeDetector(es=es, notifier=n, clock=lambda: 1_000_000.0))
+
+    async def both():
+        return await asyncio.gather(*(d.check_once() for d in dets))
+
+    asyncio.run(both())
+    assert sum(n.notify.await_count for n in notifiers) == 1
+
+
+def test_spike_query_uses_closed_concrete_window():
+    es = SpikeES([])
+    d = ErrorSpikeDetector(es=es, notifier=MagicMock(), clock=lambda: 1_000_000.0)
+    asyncio.run(d.check_once())
+    rng = es.searches[0]["query"]["bool"]["filter"][1]["range"]["timestamp"]
+    assert "now" not in str(rng)  # concrete timestamps, not re-evaluated "now-60s"
+    assert "gte" in rng and "lt" in rng  # half-open: later logs can't enter it
+    start = datetime.fromisoformat(rng["gte"])
+    end = datetime.fromisoformat(rng["lt"])
+    assert (end - start).total_seconds() == error_spike.WINDOW_SECONDS
+    # window ends LAG before "now", so ES has refreshed everything inside it
+    now = datetime.fromtimestamp(1_000_000.0, timezone.utc)
+    assert (now - end).total_seconds() == error_spike.LAG_SECONDS
 
 
 def test_heartbeats_are_sampled_not_stored_every_beat():

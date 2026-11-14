@@ -29,13 +29,27 @@ python -c "import secrets; print(secrets.token_hex(32))"
 Other settings in `.env` (all optional, sensible defaults are pre-filled):
 
 * **`RESTART_BACKEND`**: `docker` (local Docker-based restart) or `kubernetes` (K8s pod restart)
-* **Restarts:** `POST /v1/nodes/{id}/restart` only *queues* a request (HTTP 202); `heartbeat_service` executes it, so the API gateway needs no Docker socket. The key must have been issued with `can_restart: true`.
+* **Restarts:** `POST /v1/nodes/{id}/restart` returns `202 Accepted` with a `request_id`; poll `GET /v1/nodes/{id}/restarts/{request_id}` (`pending` → `running` → `done`/`failed`). See "How restarts work" below. The key must have `can_restart: true`.
 * **Tenant scoping:** issue keys with `POST /admin/keys` and `{"owner_email": "...", "node_ids": ["<node-id>"], "can_restart": false}`. A key with `node_ids` only sees those nodes' logs/nodes/heartbeats and only receives webhook events for them; an empty list means all nodes.
 * **`WEBHOOK_ALLOW_PRIVATE_TARGETS`** / **`WEBHOOK_ALLOW_HTTP`**: webhook targets must be public https by default; enable the first for a local server, the second for public plain http. Link-local/metadata addresses are always blocked.
 * **`ERROR_SPIKE_THRESHOLD`** / **`ERROR_SPIKE_WINDOW_SECONDS`**: when a node logs that many ERRORs in the window, the `error_spike` webhook event fires (5 min cooldown per node)
 * **`K8S_NAMESPACE`**: only used when `RESTART_BACKEND=kubernetes`
 * **`WEBHOOK_URL`** / **`WEBHOOK_SECRET`**: if set, `heartbeat_service` POSTs `node_down`/`node_up` events there, HMAC-signed
 * **`HEARTBEAT_INTERVAL_SECONDS`** / **`HEARTBEAT_TIMEOUT_SECONDS`**: how often services heartbeat and how long before a missed node is marked failed
+
+### How restarts work
+
+```
+client ─POST /restart─▶ api_gateway ──writes doc (pending)──▶ ES `restart_requests`
+                                                                    │ polled every 2s
+                                        heartbeat_service RestartWorker ◀┘
+                                          claims it (optimistic lock), restarts the
+                                          container/deployment, sets done/failed
+```
+
+* The API gateway holds no Docker/K8s credentials; it only enqueues. Elasticsearch is the queue because it is already the shared store both services use and it makes request status queryable. Kafka is used only for the one-way log/heartbeat ingest path.
+* The DLS learns the node is back the normal way: the restarted service resumes heartbeating over Kafka, `NodeWatcher` flips it from `failed` back to `active` and fires `node_up`.
+* Several `heartbeat_service` replicas are safe: a request is claimed with `if_seq_no`/`if_primary_term`, so only one worker executes it.
 
 ---
 

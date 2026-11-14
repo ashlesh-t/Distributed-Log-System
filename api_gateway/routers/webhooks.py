@@ -7,10 +7,10 @@ from api_gateway.auth import verify_api_key
 from api_gateway.elastic_client import get_es
 from api_gateway.schemas import WebhookCreate, WebhookInfo, WebhooksResponse
 from common import secret_box
+from common.constants import WEBHOOK_INDEX
 from common.url_safety import UnsafeURLError, assert_public_url
 
 router = APIRouter(prefix="/v1/webhooks", tags=["webhooks"])
-WEBHOOK_INDEX = "webhooks"
 
 
 async def _get_owned(webhook_id: str, key_meta: dict) -> dict:

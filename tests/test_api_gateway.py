@@ -221,6 +221,19 @@ def test_restart_is_queued_not_executed_by_gateway(env):
     assert doc["service_name"] == "Order_Service"
 
 
+def test_restart_response_has_request_id_and_status_endpoint(env):
+    es, c = env
+    as_key(c, can_restart=True)
+    es.get.return_value = {"_source": {"service_name": "S"}}
+    rid = c.post("/v1/nodes/n1/restart").json()["request_id"]
+    es.get.return_value = {"_source": {"node_id": "n1", "status": "done"}}
+    r = c.get(f"/v1/nodes/n1/restarts/{rid}")
+    assert r.status_code == 200 and r.json()["status"] == "done"
+    # a request id for a different node is not disclosed
+    es.get.return_value = {"_source": {"node_id": "other", "status": "done"}}
+    assert c.get(f"/v1/nodes/n1/restarts/{rid}").status_code == 404
+
+
 def test_gateway_does_not_import_docker_restart_handler():
     assert not hasattr(nodes, "RestartHandler")
 

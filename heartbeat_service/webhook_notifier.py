@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import httpx
 
 from common import secret_box
+from common.constants import DEFAULT_ES_HOST, ENV_ES_HOST, WEBHOOK_INDEX
 from common.url_safety import UnsafeURLError, assert_public_url
 
 
@@ -39,10 +40,10 @@ class WebhookNotifier:
         try:
             from elasticsearch import AsyncElasticsearch
 
-            host = os.environ.get("ELASTICSEARCH_HOST", "http://elasticsearch:9200")
+            host = os.environ.get(ENV_ES_HOST, DEFAULT_ES_HOST)
             es = AsyncElasticsearch(host)
             resp = await es.search(
-                index="webhooks",
+                index=WEBHOOK_INDEX,
                 body={
                     "query": {"bool": {"filter": [{"term": {"events": event}}]}},
                     "size": 100,

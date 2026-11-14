@@ -11,17 +11,22 @@ import os
 
 from cryptography.fernet import Fernet, InvalidToken
 
-PREFIX = "enc:"
-_DEFAULT = "change-me-in-production"
+from common.constants import (
+    ENCRYPTED_PREFIX as PREFIX,
+    ENV_WEBHOOK_ENCRYPTION_KEY,
+    INSECURE_DEFAULT_SECRET,
+)
 
-if os.environ.get("WEBHOOK_ENCRYPTION_KEY", _DEFAULT) == _DEFAULT:
+if os.environ.get(ENV_WEBHOOK_ENCRYPTION_KEY, INSECURE_DEFAULT_SECRET) == (
+    INSECURE_DEFAULT_SECRET
+):
     logging.getLogger(__name__).warning(
         "WEBHOOK_ENCRYPTION_KEY is unset/default; set a real value in production."
     )
 
 
 def _fernet() -> Fernet:
-    raw = os.environ.get("WEBHOOK_ENCRYPTION_KEY", _DEFAULT).encode()
+    raw = os.environ.get(ENV_WEBHOOK_ENCRYPTION_KEY, INSECURE_DEFAULT_SECRET).encode()
     return Fernet(base64.urlsafe_b64encode(hashlib.sha256(raw).digest()))
 
 
